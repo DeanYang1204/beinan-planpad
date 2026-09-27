@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: system-ui, "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+}
+
+canvas {
+  display: block;
+}

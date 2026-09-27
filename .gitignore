@@ -1,0 +1,24 @@
+# 依賴
+node_modules
+
+# 建置產物
+dist
+dist-ssr
+
+# 暫存 / 快取
+*.local
+*.log
+*.tsbuildinfo
+vite.config.ts.timestamp-*.mjs
+.playwright-cli
+
+# 編輯器 / 系統
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# 環境變數
+.env
+.env.*
