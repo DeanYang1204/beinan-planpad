@@ -1,20 +1,51 @@
 import type { DocStore } from "../engine/document";
 import { orderedDrawList } from "../engine/document";
 import { renderEntity } from "../engine/renderer";
-import { shapeVerts, arrowHeadGeom, arrowRenderPoints } from "../engine/geometry";
+import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox } from "../engine/geometry";
+import type { BBox } from "../engine/geometry";
 import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT } from "../types";
 import { PDFDocument } from "pdf-lib";
+
+/** 內容包圍盒：所有「可見實體」的聯集外框（含描邊外擴＋邊距）。無內容時退回整頁 */
+export function contentBbox(doc: PlanDoc): BBox {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let maxHalfW = 0;
+  for (const e of orderedDrawList(doc)) {
+    const b = e.bbox || entityBbox(e);
+    if (b[0] < minX) minX = b[0];
+    if (b[1] < minY) minY = b[1];
+    if (b[2] > maxX) maxX = b[2];
+    if (b[3] > maxY) maxY = b[3];
+    // 線/箭頭等描邊會外擴線寬的一半，需納入邊距
+    if (e.kind !== "text" && e.kind !== "image") maxHalfW = Math.max(maxHalfW, (e.width ?? 1) / 2);
+  }
+  if (minX === Infinity) return [0, 0, doc.pageW, doc.pageH];
+  const pad = maxHalfW + 6;
+  return [minX - pad, minY - pad, maxX + pad, maxY + pad];
+}
+
+/** 依目標 DPI 選渲染倍率：1pt = 1/72in，目標 300 DPI ≈ 4.17×，以長邊像素上限夾住避免 canvas 過大 */
+function pickScale(w: number, h: number): number {
+  const TARGET_DPI = 300;
+  const MAX_DIM = 12000;
+  const targetScale = TARGET_DPI / 72;
+  const longSide = Math.max(w, h);
+  const maxScale = longSide > 0 ? MAX_DIM / longSide : 1;
+  return Math.max(1, Math.min(targetScale, maxScale));
+}
 
 // ---------- SVG ----------
 export function exportSVG(store: DocStore): string {
   const doc = store.doc;
   if (!doc) return "";
   const parts: string[] = [];
+  const bb = contentBbox(doc);
+  const bx = bb[0], by = bb[1], bw = bb[2] - bb[0], bh = bb[3] - bb[1];
   parts.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${doc.pageW}" height="${doc.pageH}" viewBox="0 0 ${doc.pageW} ${doc.pageH}">`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(bw)}" height="${fmt(bh)}" viewBox="${fmt(bx)} ${fmt(by)} ${fmt(bw)} ${fmt(bh)}">`
   );
-  parts.push(`<rect width="${doc.pageW}" height="${doc.pageH}" fill="#ffffff"/>`);
+  parts.push(`<rect x="${fmt(bx)}" y="${fmt(by)}" width="${fmt(bw)}" height="${fmt(bh)}" fill="#ffffff"/>`);
 
   const hasHatch = doc.entities.some((e) => e.fill === "hatch");
   const hasGrid = doc.entities.some((e) => e.fill === "grid");
@@ -204,9 +235,11 @@ function escapeXml(s: string): string {
 }
 
 // ---------- 渲染共用：把文件畫到離屏 canvas（供 PNG/PDF 匯出） ----------
-function renderDocToCanvas(doc: PlanDoc, scale: number): HTMLCanvasElement {
-  const w = Math.ceil(doc.pageW * scale);
-  const h = Math.ceil(doc.pageH * scale);
+function renderDocToCanvas(doc: PlanDoc, scale: number, crop?: BBox): HTMLCanvasElement {
+  const srcW = crop ? crop[2] - crop[0] : doc.pageW;
+  const srcH = crop ? crop[3] - crop[1] : doc.pageH;
+  const w = Math.max(1, Math.ceil(srcW * scale));
+  const h = Math.max(1, Math.ceil(srcH * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -214,7 +247,11 @@ function renderDocToCanvas(doc: PlanDoc, scale: number): HTMLCanvasElement {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
 
-  const view: Viewport = { scale, ox: 0, oy: 0 };
+  const view: Viewport = {
+    scale,
+    ox: -(crop ? crop[0] : 0) * scale,
+    oy: -(crop ? crop[1] : 0) * scale,
+  };
   const opts = {
     deviceRatio: 1,
     cssW: w,
@@ -238,11 +275,13 @@ function canvasToPngBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
 }
 
 // ---------- PNG ----------
-export function exportPNG(store: DocStore, scale = 2): Promise<Blob> {
+export function exportPNG(store: DocStore, scale?: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const doc = store.doc;
     if (!doc) return reject(new Error("無文件"));
-    const canvas = renderDocToCanvas(doc, scale);
+    const bb = contentBbox(doc);
+    const s = scale ?? pickScale(bb[2] - bb[0], bb[3] - bb[1]);
+    const canvas = renderDocToCanvas(doc, s, bb);
     canvas.toBlob((blob) => {
       if (blob) resolve(blob);
       else reject(new Error("PNG 匯出失敗"));
@@ -254,17 +293,19 @@ export function exportPNG(store: DocStore, scale = 2): Promise<Blob> {
 export async function exportPDF(store: DocStore): Promise<Blob> {
   const doc = store.doc;
   if (!doc) throw new Error("無文件");
-  // 動態 scale：長邊 ≤ 8000px（canvas 上限內），兼顧清晰度
-  const maxPx = 8000;
-  const scale = Math.max(1, Math.min(3, maxPx / Math.max(doc.pageW, doc.pageH)));
-  const canvas = renderDocToCanvas(doc, scale);
+  // 只輸出有內容的範圍（內容包圍盒），並以高 DPI 渲染提高清晰度
+  const bb = contentBbox(doc);
+  const w = bb[2] - bb[0];
+  const h = bb[3] - bb[1];
+  const scale = pickScale(w, h);
+  const canvas = renderDocToCanvas(doc, scale, bb);
   const pngBytes = await canvasToPngBytes(canvas);
 
   const pdf = await PDFDocument.create();
   const png = await pdf.embedPng(pngBytes);
-  // PDF 頁面尺寸 = 原工程圖 world pt，圖檔等比縮回，物理尺寸與原圖一致
-  const page = pdf.addPage([doc.pageW, doc.pageH]);
-  page.drawImage(png, { x: 0, y: 0, width: doc.pageW, height: doc.pageH });
+  // PDF 頁面尺寸 = 內容範圍（world pt），圖檔等比填滿，物理尺寸與原圖一致
+  const page = pdf.addPage([w, h]);
+  page.drawImage(png, { x: 0, y: 0, width: w, height: h });
   const bytes = await pdf.save();
   return new Blob([bytes], { type: "application/pdf" });
 }
@@ -273,14 +314,19 @@ export async function exportPDF(store: DocStore): Promise<Blob> {
 export async function printDoc(store: DocStore): Promise<void> {
   const doc = store.doc;
   if (!doc) throw new Error("無文件");
-  // 高解析度渲染（長邊 ≤ 8000px），列印才清楚
-  const maxPx = 8000;
-  const scale = Math.max(1, Math.min(3, maxPx / Math.max(doc.pageW, doc.pageH)));
-  const canvas = renderDocToCanvas(doc, scale);
+  // 自動選取內容範圍（只印有物件的地方），並以高 DPI 渲染
+  const bb = contentBbox(doc);
+  const w = bb[2] - bb[0];
+  const h = bb[3] - bb[1];
+  const scale = pickScale(w, h);
+  const canvas = renderDocToCanvas(doc, scale, bb);
   const dataUrl = canvas.toDataURL("image/png");
+  const landscape = w > h;
+  const pageCss = landscape ? "@page{size:landscape;margin:0.5cm}" : "@page{size:auto;margin:0.5cm}";
+  const styleCss = `<style>${pageCss}html,body{margin:0;padding:0}img{width:100%;height:auto;display:block}</style>`;
 
-  const w = window.open("", "_blank", "width=900,height=700");
-  if (!w) {
+  const wnd = window.open("", "_blank", "width=900,height=700");
+  if (!wnd) {
     // 彈窗被擋時，退路：用隱藏 iframe 列印
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
@@ -292,15 +338,15 @@ export async function printDoc(store: DocStore): Promise<void> {
     document.body.appendChild(iframe);
     const idoc = iframe.contentDocument!;
     idoc.write(
-      `<!doctype html><html><head><title>北農平面圖編輯器 列印</title><style>html,body{margin:0;padding:0}img{width:100%;height:auto;display:block}</style></head><body><img src="${dataUrl}" onload="setTimeout(()=>{window.focus();window.print()},200)"></body></html>`
+      `<!doctype html><html><head><title>北農平面圖編輯器 列印</title>${styleCss}</head><body><img src="${dataUrl}" onload="setTimeout(()=>{window.focus();window.print()},200)"></body></html>`
     );
     idoc.close();
     return;
   }
-  w.document.write(
-    `<!doctype html><html><head><title>北農平面圖編輯器 列印</title><style>html,body{margin:0;padding:0}img{width:100%;height:auto;display:block}</style></head><body><img src="${dataUrl}" onload="setTimeout(()=>{window.focus();window.print()},200)"></body></html>`
+  wnd.document.write(
+    `<!doctype html><html><head><title>北農平面圖編輯器 列印</title>${styleCss}</head><body><img src="${dataUrl}" onload="setTimeout(()=>{window.focus();window.print()},200)"></body></html>`
   );
-  w.document.close();
+  wnd.document.close();
 }
 
 // ---------- JSON 專案檔 ----------

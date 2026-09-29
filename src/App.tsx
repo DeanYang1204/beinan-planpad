@@ -6,7 +6,7 @@ import OptionsBar from "./components/OptionsBar";
 import LayerPanel from "./components/LayerPanel";
 import PropertyPanel from "./components/PropertyPanel";
 import HistoryPanel from "./components/HistoryPanel";
-import { exportSVG, exportPNG, exportPDF, exportJSON, printDoc, downloadBlob, downloadText } from "./export/io";
+import { exportSVG, exportPNG, exportPDF, exportJSON, printDoc, downloadBlob, downloadText, contentBbox } from "./export/io";
 import { saveProject, loadProject, normalizeProject } from "./engine/persistence";
 import { arrowHeadGeom, arrowBendHandlePos, arrowRenderPoints, entityBbox } from "./engine/geometry";
 import type { ToolId } from "./types";
@@ -24,7 +24,7 @@ export default function App() {
   // 暴露到 window 供測試/診斷
   (window as any).__planpad = store;
   (window as any).__planpad_geom = { arrowHeadGeom, arrowBendHandlePos, arrowRenderPoints, entityBbox };
-  (window as any).__planpad_io = { exportSVG };
+  (window as any).__planpad_io = { exportSVG, contentBbox, exportPDF, exportPNG };
 
   const workerRef = useRef<Worker | null>(null);
   const apiRef = useRef<CanvasApi | null>(null);
@@ -214,7 +214,7 @@ export default function App() {
       }
     } else {
       try {
-        const blob = await exportPNG(store, 2);
+        const blob = await exportPNG(store);
         downloadBlob(blob, "beinan-plan.png");
       } catch (err) {
         setError("PNG 匯出失敗");
