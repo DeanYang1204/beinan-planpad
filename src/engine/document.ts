@@ -783,6 +783,35 @@ export class DocStore {
     this.doc.metersPerPt = after;
     this.emit();
   }
+  /** 設定距離標註的實際長度（公尺）：依已校正比例換算成 pt，縮放終點（保持起點與方向不變），undoable。
+   *  未校正比例（無 metersPerPt）或長度非正數時不動作並回傳 false。 */
+  setDimensionMeters(id: string, meters: number): boolean {
+    const e = this.byId(id);
+    if (!e || e.kind !== "dimension" || e.pts.length < 4) return false;
+    const mpp = this.doc?.metersPerPt;
+    if (!mpp || mpp <= 0 || !(meters > 0)) return false;
+    const x0 = e.pts[0], y0 = e.pts[1], x1 = e.pts[2], y1 = e.pts[3];
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len < 1e-9) return false;
+    const target = meters / mpp;
+    if (Math.abs(target - len) < 1e-9) return false;
+    const ux = (x1 - x0) / len, uy = (y1 - y0) / len;
+    const beforePts = e.pts.slice();
+    const afterPts = [x0, y0, x0 + ux * target, y0 + uy * target];
+    const self = this;
+    this.push({
+      label: "設定長度",
+      redo: () => {
+        const t = self.byId(id);
+        if (t) { t.pts = afterPts.slice(); t.bbox = entityBbox(t); }
+      },
+      undo: () => {
+        const t = self.byId(id);
+        if (t) { t.pts = beforePts.slice(); t.bbox = entityBbox(t); }
+      },
+    });
+    return true;
+  }
   /** 設定單一圖層不透明度（0–1），undoable；連續調整同一圖層會合併為一步（避免滑桿拖動產生大量步驟） */
   setLayerOpacity(id: string, opacity: number) {
     if (!this.doc) return;

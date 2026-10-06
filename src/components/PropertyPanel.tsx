@@ -127,6 +127,7 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
             store={store}
             ptLength={Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1])}
           />
+          <SetLength store={store} id={first.id} />
           <div className="mt-3 mb-1 text-xs text-neutral-500">顏色</div>
           <ColorPicker value={first.stroke} onChange={(c) => store.updateStyle(first.id, { stroke: c })} />
           <div className="mt-3 mb-1 text-xs text-neutral-500">線寬</div>
@@ -494,6 +495,50 @@ function Recalibrate({ store, ptLength }: { store: DocStore; ptLength: number })
         <button
           onClick={apply}
           disabled={!(parseFloat(value) > 0)}
+          className="px-2 py-1 rounded border border-primary-600 bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 disabled:opacity-40 dark:bg-primary-900 dark:text-primary-200"
+        >
+          套用
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 設定長度：校正比例後，輸入目標公尺數自動把標註線拉長/縮短到對應寬度 */
+function SetLength({ store, id }: { store: DocStore; id: string }) {
+  const [value, setValue] = useState("");
+  const calibrated = !!(store.doc?.metersPerPt && store.doc.metersPerPt > 0);
+  const apply = () => {
+    const m = parseFloat(value);
+    if (isFinite(m) && m > 0) {
+      store.setDimensionMeters(id, m);
+      setValue("");
+    }
+  };
+  return (
+    <div className="mt-3">
+      <div className="text-xs text-neutral-500 mb-1">設定長度（自動調整）</div>
+      {!calibrated && (
+        <div className="text-[11px] text-amber-600 dark:text-amber-400 mb-1">
+          請先校正比例（上方「以此段重新校準」）
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          step={0.01}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply()}
+          placeholder={calibrated ? "目標公尺" : "未校準"}
+          disabled={!calibrated}
+          className="flex-1 min-w-0 px-2 py-1 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-xs disabled:opacity-40"
+        />
+        <span className="text-xs text-neutral-400 shrink-0">米</span>
+        <button
+          onClick={apply}
+          disabled={!calibrated || !(parseFloat(value) > 0)}
           className="px-2 py-1 rounded border border-primary-600 bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 disabled:opacity-40 dark:bg-primary-900 dark:text-primary-200"
         >
           套用
