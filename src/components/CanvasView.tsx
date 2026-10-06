@@ -319,6 +319,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       case "measure": {
         const gh = mk([...d.startW, ...d.curW], "dimension");
         gh.fontSize = styleRef.current.fontSize;
+        gh.bgColor = "#ffffff";
         out = { ghost: gh };
         break;
       }
@@ -1136,6 +1137,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
             stroke: styleRef.current.stroke,
             width: styleRef.current.width,
             fontSize: styleRef.current.fontSize,
+            bgColor: "#ffffff",
             origin: "user",
             layerId: store.ensureDrawLayer(styleRef.current.stroke, KIND_LABEL.dimension),
           };

@@ -145,6 +145,30 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
               </button>
             ))}
           </div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500">文字底色</div>
+          <BgPicker
+            value={first.bgColor ?? ""}
+            onChange={(c) => store.updateStyle(first.id, { bgColor: c || undefined })}
+          />
+          {first.bgColor && (
+            <>
+              <div className="mt-2 mb-1 text-xs text-neutral-500 flex justify-between">
+                <span>底色不透明度</span>
+                <span className="text-neutral-400">{Math.round((first.bgOpacity ?? 1) * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={Math.round((first.bgOpacity ?? 1) * 100)}
+                onChange={(e) =>
+                  store.updateStyle(first.id, { bgOpacity: parseInt(e.target.value, 10) / 100 })
+                }
+                className="w-full"
+              />
+            </>
+          )}
         </div>
       ) : single && first.kind === "text" ? (
         <div>

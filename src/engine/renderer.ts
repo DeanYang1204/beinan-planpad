@@ -244,8 +244,15 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     const tw = ctx.measureText(label).width;
     const padX = fspt * 0.15 * s;
     const padY = fspt * 0.15 * s;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(lsx - tw / 2 - padX, lsy - fs / 2 - padY, tw + padX * 2, fs + padY * 2);
+    // 底色可調（與文字一致：bgColor 空 = 無底色、bgOpacity 控制不透明度）
+    if (e.bgColor) {
+      const bgOp = e.bgOpacity ?? 1;
+      ctx.save();
+      if (bgOp < 1) ctx.globalAlpha = bgOp;
+      ctx.fillStyle = e.bgColor;
+      ctx.fillRect(lsx - tw / 2 - padX, lsy - fs / 2 - padY, tw + padX * 2, fs + padY * 2);
+      ctx.restore();
+    }
     ctx.fillStyle = e.stroke;
     ctx.fillText(label, lsx, lsy);
     ctx.restore();

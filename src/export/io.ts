@@ -112,9 +112,15 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
     const tw = measureTextWidth(label, fs);
     const padX = fs * 0.15;
     const padY = fs * 0.15;
+    // 底色可調（與文字一致：bgColor 空 = 無底色、bgOpacity 控制不透明度）
+    const bgOp = e.bgOpacity ?? 1;
+    const bgOpAttr = bgOp < 1 ? ` fill-opacity="${fmt(bgOp)}"` : "";
+    const bgRect = e.bgColor
+      ? `<rect x="${fmt(lx - tw / 2 - padX)}" y="${fmt(ly - fs / 2 - padY)}" width="${fmt(tw + padX * 2)}" height="${fmt(fs + padY * 2)}" fill="${e.bgColor}"${bgOpAttr}/>`
+      : "";
     const line = `<path d="M${fmt(g.x0)} ${fmt(g.y0)} L${fmt(g.x1)} ${fmt(g.y1)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
     const ticks = `<path d="M${fmt(g.x0 - g.nx * tick)} ${fmt(g.y0 - g.ny * tick)} L${fmt(g.x0 + g.nx * tick)} ${fmt(g.y0 + g.ny * tick)} M${fmt(g.x1 - g.nx * tick)} ${fmt(g.y1 - g.ny * tick)} L${fmt(g.x1 + g.nx * tick)} ${fmt(g.y1 + g.ny * tick)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}"/>`;
-    const labelG = `<g><rect x="${fmt(lx - tw / 2 - padX)}" y="${fmt(ly - fs / 2 - padY)}" width="${fmt(tw + padX * 2)}" height="${fmt(fs + padY * 2)}" fill="#ffffff"/><text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${e.stroke}" font-family="${fontStack(undefined).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
+    const labelG = `<g>${bgRect}<text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${e.stroke}" font-family="${fontStack(undefined).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
     return line + ticks + labelG;
   }
 
