@@ -885,6 +885,15 @@ export class DocStore {
     }
     this.emit();
   }
+  /** 批量顯示/隱藏多個圖層（非 undoable，與單層顯隱一致） */
+  setLayersVisible(ids: string[], visible: boolean) {
+    if (!this.doc || ids.length === 0) return;
+    for (const id of ids) {
+      const layer = this.doc.layers.find((l) => l.id === id);
+      if (layer) layer.visible = visible;
+    }
+    this.emit();
+  }
   /** 合併多個圖層：實體併入第一個圖層，其餘圖層刪除（undoable） */
   mergeLayers(ids: string[]): boolean {
     if (!this.doc || ids.length < 2) return false;

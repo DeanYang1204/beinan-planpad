@@ -82,6 +82,26 @@ export default function LayerPanel({ store }: Props) {
     store.setLayersLocked([...selectedIds], locked);
   }
 
+  function hideSelected() {
+    store.setLayersVisible([...selectedIds], false);
+  }
+
+  function showSelected() {
+    store.setLayersVisible([...selectedIds], true);
+  }
+
+  /** 勾選/取消勾選整個群組（勾選群組 = 勾選其全部成員圖層） */
+  function toggleGroupSelect(memberIds: string[], checked: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of memberIds) {
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
   function mergeSelected() {
     store.mergeLayers([...selectedIds]);
     setSelectedIds(new Set());
@@ -153,8 +173,22 @@ export default function LayerPanel({ store }: Props) {
 
       {/* 多選工具列（有勾選時顯示） */}
       {selCount > 0 && (
-        <div className="flex items-center gap-1 px-2 py-1.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+        <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
           <span className="text-[11px] text-neutral-500 mr-1">已選 {selCount}</span>
+          <button
+            onClick={hideSelected}
+            className="px-2 py-1 rounded text-xs border border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-700"
+            title="隱藏所選圖層"
+          >
+            👁 隱藏
+          </button>
+          <button
+            onClick={showSelected}
+            className="px-2 py-1 rounded text-xs border border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-700"
+            title="顯示所選圖層"
+          >
+            ◉ 顯示
+          </button>
           <button
             onClick={() => lockSelected(true)}
             className="px-2 py-1 rounded text-xs border border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-700"
@@ -247,6 +281,7 @@ export default function LayerPanel({ store }: Props) {
               collapsed={collapsedGroups.has(r.group.id)}
               onToggleCollapse={() => toggleCollapse(r.group.id)}
               onToggleSelect={toggleSelect}
+              onToggleGroupSelect={toggleGroupSelect}
               onSelectRow={(id) => {
                 store.setActiveLayer(id);
                 selectOnly(id);
@@ -307,6 +342,7 @@ function GroupBlock({
   collapsed,
   onToggleCollapse,
   onToggleSelect,
+  onToggleGroupSelect,
   onSelectRow,
   dragId,
   dropTarget,
@@ -326,6 +362,7 @@ function GroupBlock({
   collapsed: boolean;
   onToggleCollapse: () => void;
   onToggleSelect: (id: string) => void;
+  onToggleGroupSelect: (memberIds: string[], checked: boolean) => void;
   onSelectRow: (id: string) => void;
   dragId: string | null;
   dropTarget: DropTarget;
@@ -343,6 +380,10 @@ function GroupBlock({
   const allLocked = members.length > 0 && lockedCount === members.length;
   const total = members.reduce((s, l) => s + (counts.get(l.id) ?? 0), 0);
   const isGroupDrop = dragId !== null && dropTarget?.kind === "group" && dropTarget.id === group.id;
+  // 群組勾選狀態：全部成員被勾選 = 勾選；部分 = 半選（indeterminate）
+  const checkedCount = members.filter((l) => selectedIds.has(l.id)).length;
+  const allChecked = members.length > 0 && checkedCount === members.length;
+  const anyChecked = checkedCount > 0;
 
   return (
     <div>
@@ -361,6 +402,21 @@ function GroupBlock({
           onDropOnGroup();
         }}
       >
+        {/* 群組複選框：勾選 = 選取整個群組的所有成員 */}
+        <input
+          type="checkbox"
+          checked={allChecked}
+          ref={(el) => {
+            if (el) el.indeterminate = anyChecked && !allChecked;
+          }}
+          onChange={(e) => {
+            e.stopPropagation();
+            onToggleGroupSelect(members.map((l) => l.id), !allChecked);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 w-3.5 h-3.5 accent-primary-600 cursor-pointer"
+          title="勾選整個群組（選取群組內所有圖層）"
+        />
         {/* 摺疊箭頭 */}
         <button
           onClick={(e) => {
