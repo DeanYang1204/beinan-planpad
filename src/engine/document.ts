@@ -775,6 +775,69 @@ export class DocStore {
     if (layer) layer.locked = locked;
     this.emit();
   }
+  /** 設定單一圖層不透明度（0–1），undoable；連續調整同一圖層會合併為一步（避免滑桿拖動產生大量步驟） */
+  setLayerOpacity(id: string, opacity: number) {
+    if (!this.doc) return;
+    const layer = this.doc.layers.find((l) => l.id === id);
+    if (!layer) return;
+    const before = layer.opacity;
+    const after = Math.max(0, Math.min(1, opacity));
+    if (before === after) return;
+    // 上一步是同一圖層的「圖層不透明度」→ 合併（更新目標值），不新增 undo 步
+    const top = this.undoStack[this.undoStack.length - 1] as (Command & { opId?: string; opAfter?: number }) | undefined;
+    if (top && top.label === "圖層不透明度" && top.opId === id) {
+      layer.opacity = after;
+      top.opAfter = after;
+      this.emit();
+      return;
+    }
+    layer.opacity = after;
+    const self = this;
+    const cmd = {
+      label: "圖層不透明度",
+      opId: id,
+      opAfter: after,
+      redo: () => {
+        const l = self.doc?.layers.find((x) => x.id === id);
+        if (l) l.opacity = cmd.opAfter;
+      },
+      undo: () => {
+        const l = self.doc?.layers.find((x) => x.id === id);
+        if (l) l.opacity = before;
+      },
+    };
+    this.undoStack.push(cmd);
+    this.redoStack.length = 0;
+    this.emit();
+  }
+  /** 批量設定多個圖層不透明度（0–1），undoable（合併為一步） */
+  setLayersOpacity(ids: string[], opacity: number) {
+    if (!this.doc || ids.length === 0) return;
+    const after = Math.max(0, Math.min(1, opacity));
+    const changed: { id: string; before?: number }[] = [];
+    for (const id of ids) {
+      const l = this.doc.layers.find((x) => x.id === id);
+      if (!l || l.opacity === after) continue;
+      changed.push({ id, before: l.opacity });
+    }
+    if (changed.length === 0) return;
+    const self = this;
+    this.push({
+      label: "圖層不透明度",
+      redo: () => {
+        for (const { id } of changed) {
+          const l = self.doc?.layers.find((x) => x.id === id);
+          if (l) l.opacity = after;
+        }
+      },
+      undo: () => {
+        for (const { id, before } of changed) {
+          const l = self.doc?.layers.find((x) => x.id === id);
+          if (l) l.opacity = before;
+        }
+      },
+    });
+  }
   /** 批量鎖定/解鎖多個圖層 */
   setLayersLocked(ids: string[], locked: boolean) {
     if (!this.doc || ids.length === 0) return;

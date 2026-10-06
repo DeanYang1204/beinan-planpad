@@ -105,6 +105,8 @@ export interface Layer {
   count: number;
   /** 所屬圖層組 id（PS 圖層群組/資料夾），無則未分組 */
   groupId?: string;
+  /** 圖層不透明度 0–1（1 = 完全不透明，預設）；未設定視為 1 */
+  opacity?: number;
 }
 
 /** 圖層組（PS 群組資料夾）：把多個圖層收納為一個可摺疊、整體顯隱的組 */

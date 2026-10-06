@@ -192,6 +192,9 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       if (!base || !overlay) return;
       const { w, h, ratio } = sizeRef.current;
       const view = viewRef.current;
+      // 圖層不透明度映射（每幀重建，成本可忽略）
+      const layerOpacity = new Map<string, number>();
+      if (store.doc) for (const l of store.doc.layers) layerOpacity.set(l.id, l.opacity ?? 1);
       const opts: RenderOpts = {
         deviceRatio: ratio,
         cssW: w,
@@ -203,6 +206,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         showGrid: showGridRef.current,
         crosshair: showCrosshairRef.current ? crosshairRef.current : null,
         midHandleStretch: toolRef.current === "select",
+        layerOpacity,
       };
 
       if (baseDirty.current) {

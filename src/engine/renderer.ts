@@ -22,6 +22,8 @@ export interface RenderOpts {
   crosshair?: [number, number] | null;
   /** select 工具下矩形邊中點為「拉伸」把手（綠色），否則為「插入錨點」把手（藍色） */
   midHandleStretch?: boolean;
+  /** 圖層不透明度映射（layerId → 0–1）；缺漏視為 1 */
+  layerOpacity?: Map<string, number>;
 }
 
 export interface RenderState {
@@ -107,8 +109,17 @@ function getImage(dataUrl: string): HTMLImageElement | null {
   return img;
 }
 
-/** 畫單一 entity（座標為 world，透過 view 轉換） */
+/** 畫單一 entity（座標為 world，透過 view 轉換）；外層套用所屬圖層不透明度 */
 export function renderEntity(ctx: CanvasRenderingContext2D, e: VecEntity, opts: RenderOpts) {
+  const layerOp = opts.layerOpacity?.get(e.layerId) ?? 1;
+  ctx.save();
+  if (layerOp < 1) ctx.globalAlpha = layerOp;
+  renderEntityInner(ctx, e, opts);
+  ctx.restore();
+}
+
+/** renderEntity 的實際繪製主體（圖層不透明度已在外層套用） */
+function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: RenderOpts) {
   const v = opts.view;
   const s = v.scale;
   const minW = opts.minStrokeW ?? 0;
@@ -161,11 +172,12 @@ export function renderEntity(ctx: CanvasRenderingContext2D, e: VecEntity, opts: 
       const bw = tw * s + padX * 2;
       const bh = blk.h * s + padY * 2;
       if (e.bgColor) {
-        ctx.fillStyle = e.bgColor;
         const op = e.bgOpacity ?? 1;
+        ctx.save();
         if (op < 1) ctx.globalAlpha = op;
+        ctx.fillStyle = e.bgColor;
         ctx.fillRect(bx, by, bw, bh);
-        if (op < 1) ctx.globalAlpha = 1;
+        ctx.restore();
       }
       if (e.borderColor && e.borderWidth) {
         ctx.strokeStyle = e.borderColor;

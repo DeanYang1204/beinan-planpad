@@ -64,9 +64,18 @@ export function exportSVG(store: DocStore): string {
     parts.push(`<defs>${defs.join("")}</defs>`);
   }
 
-  // 依圖層堆疊順序匯出（與畫布一致：由最下層畫到最上層）
+  // 依圖層堆疊順序匯出（與畫布一致：由最下層畫到最上層）；套用圖層不透明度
+  const layerOp = new Map<string, number>();
+  for (const l of doc.layers) layerOp.set(l.id, l.opacity ?? 1);
   for (const e of orderedDrawList(doc)) {
-    parts.push(entityToSVG(e));
+    const op = layerOp.get(e.layerId) ?? 1;
+    const svg = entityToSVG(e);
+    if (op < 1) {
+      // 文字/圖片若已自帶 <g transform>，將 opacity 加到外層 <g>（SVG 允許 transform+opacity 並存）
+      parts.push(`<g opacity="${fmt(op)}">${svg}</g>`);
+    } else {
+      parts.push(svg);
+    }
   }
   parts.push(`</svg>`);
   return parts.join("\n");
@@ -235,7 +244,7 @@ function escapeXml(s: string): string {
 }
 
 // ---------- 渲染共用：把文件畫到離屏 canvas（供 PNG/PDF 匯出） ----------
-function renderDocToCanvas(doc: PlanDoc, scale: number, crop?: BBox): HTMLCanvasElement {
+export function renderDocToCanvas(doc: PlanDoc, scale: number, crop?: BBox): HTMLCanvasElement {
   const srcW = crop ? crop[2] - crop[0] : doc.pageW;
   const srcH = crop ? crop[3] - crop[1] : doc.pageH;
   const w = Math.max(1, Math.ceil(srcW * scale));
@@ -252,6 +261,8 @@ function renderDocToCanvas(doc: PlanDoc, scale: number, crop?: BBox): HTMLCanvas
     ox: -(crop ? crop[0] : 0) * scale,
     oy: -(crop ? crop[1] : 0) * scale,
   };
+  const layerOpacity = new Map<string, number>();
+  for (const l of doc.layers) layerOpacity.set(l.id, l.opacity ?? 1);
   const opts = {
     deviceRatio: 1,
     cssW: w,
@@ -259,6 +270,7 @@ function renderDocToCanvas(doc: PlanDoc, scale: number, crop?: BBox): HTMLCanvas
     view,
     selection: new Set<string>(),
     minStrokeW: 0.3,
+    layerOpacity,
   };
   // 依圖層堆疊順序繪製（與畫布一致：由最下層畫到最上層）
   for (const e of orderedDrawList(doc)) renderEntity(ctx, e, opts as any);

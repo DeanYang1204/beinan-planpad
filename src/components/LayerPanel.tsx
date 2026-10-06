@@ -258,6 +258,30 @@ export default function LayerPanel({ store }: Props) {
       <div className="px-3 py-1.5 text-[10px] text-neutral-400 border-t border-neutral-200 dark:border-neutral-800">
         拖曳調上下層 · 拖到群組收納 · 雙擊改名 · 🗑 刪除
       </div>
+
+      {/* 操作中圖層的不透明度滑桿（點擊圖層列後出現） */}
+      {activeId &&
+        (() => {
+          const activeLayer = doc.layers.find((l) => l.id === activeId);
+          if (!activeLayer) return null;
+          const op = Math.round((activeLayer.opacity ?? 1) * 100);
+          return (
+            <div className="px-3 py-2 border-t border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
+              <span className="text-[11px] text-neutral-500 shrink-0">不透明度</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={op}
+                onChange={(e) => store.setLayerOpacity(activeId, parseInt(e.target.value, 10) / 100)}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="flex-1 accent-primary-600 cursor-pointer"
+                title="調整操作中圖層的不透明度"
+              />
+              <span className="text-[11px] text-neutral-500 w-9 text-right shrink-0 tabular-nums">{op}%</span>
+            </div>
+          );
+        })()}
     </div>
   );
 }
@@ -562,6 +586,11 @@ function LayerRow({
       {layer.locked && (
         <span className="text-[9px] px-1 rounded bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300 shrink-0">
           鎖定
+        </span>
+      )}
+      {(layer.opacity ?? 1) < 1 && (
+        <span className="text-[9px] px-1 rounded bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300 shrink-0 tabular-nums">
+          {Math.round((layer.opacity ?? 1) * 100)}%
         </span>
       )}
       <span className="text-[10px] text-neutral-400 w-11 text-right shrink-0">{count}</span>
