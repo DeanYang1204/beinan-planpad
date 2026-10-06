@@ -44,6 +44,35 @@ export function dimensionLabelPos(e: {
   return { x: g.mx + g.nx * off * dir, y: g.my + g.ny * off * dir, nx: g.nx, ny: g.ny };
 }
 
+/** 距離標註的雙向箭頭（world 座標）：兩端實心箭頭（tip 在端點、張開朝線內），並回傳內縮後的主線起訖點。 */
+export function dimensionArrows(e: { pts: number[]; fontSize?: number }): {
+  arrows: { tip: [number, number]; w1: [number, number]; w2: [number, number] }[];
+  mainFrom: [number, number];
+  mainTo: [number, number];
+} | null {
+  const g = dimensionGeom(e);
+  if (!g) return null;
+  const fs = e.fontSize ?? 12;
+  const headLen = Math.max(8, fs * 0.7);
+  const halfW = Math.max(4, fs * 0.35);
+  const dx = (g.x1 - g.x0) / g.len, dy = (g.y1 - g.y0) / g.len;
+  const px = -dy, py = dx; // 垂直方向
+  const make = (tip: [number, number], toward: number) => {
+    const bx = tip[0] + dx * headLen * toward;
+    const by = tip[1] + dy * headLen * toward;
+    return {
+      tip,
+      w1: [bx + px * halfW, by + py * halfW] as [number, number],
+      w2: [bx - px * halfW, by - py * halfW] as [number, number],
+    };
+  };
+  return {
+    arrows: [make([g.x0, g.y0], 1), make([g.x1, g.y1], -1)],
+    mainFrom: [g.x0 + dx * headLen, g.y0 + dy * headLen],
+    mainTo: [g.x1 - dx * headLen, g.y1 - dy * headLen],
+  };
+}
+
 /** 未旋轉的 entity 包圍盒（不含 userRot） */
 export function entityBboxRaw(e: BboxEntity): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

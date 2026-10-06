@@ -275,14 +275,14 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-/** 格式化公尺數值為標註文字（去尾零，如 3.6 米、12.35 米、0.45 米） */
+/** 格式化公尺數值為標註文字（去尾零，如 3.6 M、12.35 M、0.45 M） */
 export function formatMeters(m: number): string {
   let s: string;
   const a = Math.abs(m);
   if (a >= 100) s = m.toFixed(1);
   else if (a >= 1) s = m.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
   else s = m.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
-  return s + " 米";
+  return s + " M";
 }
 
 /** 距離標註的文字：已校準（有 metersPerPt）→ 公尺；未校準 → 提示 */

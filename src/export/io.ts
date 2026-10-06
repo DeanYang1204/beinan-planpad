@@ -1,7 +1,7 @@
 import type { DocStore } from "../engine/document";
 import { orderedDrawList } from "../engine/document";
 import { renderEntity } from "../engine/renderer";
-import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom, dimensionLabelPos } from "../engine/geometry";
+import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom, dimensionLabelPos, dimensionArrows } from "../engine/geometry";
 import type { BBox } from "../engine/geometry";
 import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, measureTextWidth, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
@@ -104,7 +104,6 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
     const g = dimensionGeom(e);
     if (!g) return "";
     const fs = e.fontSize ?? 12;
-    const tick = fs * 0.5;
     const lp = dimensionLabelPos(e);
     const lx = lp?.x ?? g.mx;
     const ly = lp?.y ?? g.my;
@@ -128,10 +127,18 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
       e.borderColor && e.borderWidth
         ? `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="none" stroke="${e.borderColor}" stroke-width="${fmt(e.borderWidth)}"/>`
         : "";
-    const line = `<path d="M${fmt(g.x0)} ${fmt(g.y0)} L${fmt(g.x1)} ${fmt(g.y1)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
-    const ticks = `<path d="M${fmt(g.x0 - g.nx * tick)} ${fmt(g.y0 - g.ny * tick)} L${fmt(g.x0 + g.nx * tick)} ${fmt(g.y0 + g.ny * tick)} M${fmt(g.x1 - g.nx * tick)} ${fmt(g.y1 - g.ny * tick)} L${fmt(g.x1 + g.nx * tick)} ${fmt(g.y1 + g.ny * tick)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}"/>`;
+    // 雙向箭頭：主線（兩端內縮）＋兩端實心箭頭（朝線內）
+    const ar = dimensionArrows(e);
+    let line = "";
+    let arrowPolys = "";
+    if (ar) {
+      line = `<path d="M${fmt(ar.mainFrom[0])} ${fmt(ar.mainFrom[1])} L${fmt(ar.mainTo[0])} ${fmt(ar.mainTo[1])}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
+      arrowPolys = ar.arrows
+        .map((a) => `<polygon points="${fmt(a.tip[0])},${fmt(a.tip[1])} ${fmt(a.w1[0])},${fmt(a.w1[1])} ${fmt(a.w2[0])},${fmt(a.w2[1])}" fill="${e.stroke}"/>`)
+        .join("");
+    }
     const labelG = `<g>${bgRect}${borderRect}<text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${labelFill}" font-family="${fontStack(e.fontFamily).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
-    return line + ticks + labelG;
+    return line + arrowPolys + labelG;
   }
 
   if (e.kind === "text") {

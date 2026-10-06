@@ -3,7 +3,7 @@ import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
 import type { DocStore } from "./document";
 import type { BBox } from "./geometry";
-import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom, dimensionLabelPos } from "./geometry";
+import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom, dimensionLabelPos, dimensionArrows } from "./geometry";
 
 export interface RenderOpts {
   deviceRatio: number;
@@ -212,25 +212,32 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     if (!g) return;
     const fspt = e.fontSize ?? 12;
     const fs = fspt * s;
-    const [sx0, sy0] = worldToScreen(v, g.x0, g.y0);
-    const [sx1, sy1] = worldToScreen(v, g.x1, g.y1);
     const lw = Math.max(e.width * s, minW);
     ctx.strokeStyle = e.stroke;
     ctx.lineWidth = lw;
     ctx.setLineDash([]);
-    // 主線
-    ctx.beginPath();
-    ctx.moveTo(sx0, sy0);
-    ctx.lineTo(sx1, sy1);
-    ctx.stroke();
-    // 兩端垂直刻度
-    const tick = fspt * 0.5 * s;
-    ctx.beginPath();
-    ctx.moveTo(sx0 - g.nx * tick, sy0 - g.ny * tick);
-    ctx.lineTo(sx0 + g.nx * tick, sy0 + g.ny * tick);
-    ctx.moveTo(sx1 - g.nx * tick, sy1 - g.ny * tick);
-    ctx.lineTo(sx1 + g.nx * tick, sy1 + g.ny * tick);
-    ctx.stroke();
+    // 雙向箭頭：主線（兩端內縮讓位給箭頭）＋兩端實心箭頭（朝線內）
+    const ar = dimensionArrows(e);
+    if (ar) {
+      const [mx0, my0] = worldToScreen(v, ar.mainFrom[0], ar.mainFrom[1]);
+      const [mx1, my1] = worldToScreen(v, ar.mainTo[0], ar.mainTo[1]);
+      ctx.beginPath();
+      ctx.moveTo(mx0, my0);
+      ctx.lineTo(mx1, my1);
+      ctx.stroke();
+      ctx.fillStyle = e.stroke;
+      for (const a of ar.arrows) {
+        const [tx, ty] = worldToScreen(v, a.tip[0], a.tip[1]);
+        const [w1x, w1y] = worldToScreen(v, a.w1[0], a.w1[1]);
+        const [w2x, w2y] = worldToScreen(v, a.w2[0], a.w2[1]);
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(w1x, w1y);
+        ctx.lineTo(w2x, w2y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
     // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方）
     const label = dimensionLabel(g.len, opts.metersPerPt);
     const lp = dimensionLabelPos(e);
