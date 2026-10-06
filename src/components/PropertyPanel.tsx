@@ -128,8 +128,23 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
             ptLength={Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1])}
           />
           <SetLength store={store} id={first.id} />
-          <div className="mt-3 mb-1 text-xs text-neutral-500">顏色</div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500">線條顏色</div>
           <ColorPicker value={first.stroke} onChange={(c) => store.updateStyle(first.id, { stroke: c })} />
+          <div className="mt-3 mb-1 text-xs text-neutral-500 flex items-center justify-between">
+            <span>文字顏色</span>
+            <button
+              onClick={() => store.updateStyle(first.id, { labelColor: undefined })}
+              className={`px-1.5 py-0.5 rounded border text-[10px] leading-none ${
+                !first.labelColor
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-500 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              }`}
+              title="文字顏色跟隨線條顏色"
+            >
+              ↺ 跟隨線色
+            </button>
+          </div>
+          <ColorPicker value={first.labelColor ?? first.stroke} onChange={(c) => store.updateStyle(first.id, { labelColor: c })} />
           <div className="mt-3 mb-1 text-xs text-neutral-500">線寬</div>
           <div className="flex flex-wrap gap-1">
             {WIDTHS.map((w) => (
@@ -156,6 +171,29 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
             onChange={(e) => store.resizeText(first.id, parseFloat(e.target.value))}
             className="w-full"
           />
+          <div className="mt-3 mb-1 text-xs text-neutral-500">文字位置</div>
+          <div className="flex gap-1">
+            <button
+              onClick={() => store.updateStyle(first.id, { labelSide: "above" })}
+              className={`flex-1 px-2 py-1.5 rounded border text-xs ${
+                (first.labelSide ?? "below") === "above"
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+              }`}
+            >
+              ↑ 線條上方
+            </button>
+            <button
+              onClick={() => store.updateStyle(first.id, { labelSide: "below" })}
+              className={`flex-1 px-2 py-1.5 rounded border text-xs ${
+                (first.labelSide ?? "below") === "below"
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+              }`}
+            >
+              ↓ 線條下方
+            </button>
+          </div>
           <div className="mt-3 mb-1 text-xs text-neutral-500">字型</div>
           <select
             value={first.fontFamily ?? ""}

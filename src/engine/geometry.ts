@@ -30,6 +30,20 @@ export function dimensionGeom(e: { pts: number[] }): {
   return { x0, y0, x1, y1, nx, ny, len, mx: (x0 + x1) / 2, my: (y0 + y1) / 2 };
 }
 
+/** 距離標註標籤中心點（world）：沿法線外浮，labelSide 決定在線的哪一側（above = 反法線、below = 法線方向） */
+export function dimensionLabelPos(e: {
+  pts: number[];
+  fontSize?: number;
+  labelSide?: "above" | "below";
+}): { x: number; y: number; nx: number; ny: number } | null {
+  const g = dimensionGeom(e);
+  if (!g) return null;
+  const fs = e.fontSize ?? 12;
+  const off = fs * 0.7;
+  const dir = e.labelSide === "above" ? -1 : 1;
+  return { x: g.mx + g.nx * off * dir, y: g.my + g.ny * off * dir, nx: g.nx, ny: g.ny };
+}
+
 /** 未旋轉的 entity 包圍盒（不含 userRot） */
 export function entityBboxRaw(e: BboxEntity): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -296,11 +310,10 @@ export function distToEntity(e: VecEntity, px: number, py: number, tolerance: nu
   if (e.kind === "dimension") {
     const g = dimensionGeom(e);
     if (!g) return Infinity;
-    // 標籤命中（外浮於中點垂直方向，半徑約字號）
+    // 標籤命中（外浮於中點法線方向，半徑約字號；labelSide 決定上下方）
     const fs = e.fontSize ?? 12;
-    const off = fs * 0.7;
-    const lx = g.mx + g.nx * off, ly = g.my + g.ny * off;
-    if (Math.hypot(px - lx, py - ly) <= fs + 2) return 0;
+    const lp = dimensionLabelPos(e);
+    if (lp && Math.hypot(px - lp.x, py - lp.y) <= fs + 2) return 0;
     return pointSegDist(px, py, g.x0, g.y0, g.x1, g.y1) <= tol ? 0 : Infinity;
   }
   if (e.kind === "text" || e.kind === "image") {

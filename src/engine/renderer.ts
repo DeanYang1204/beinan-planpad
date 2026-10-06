@@ -3,7 +3,7 @@ import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
 import type { DocStore } from "./document";
 import type { BBox } from "./geometry";
-import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom } from "./geometry";
+import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom, dimensionLabelPos } from "./geometry";
 
 export interface RenderOpts {
   deviceRatio: number;
@@ -231,11 +231,11 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     ctx.moveTo(sx1 - g.nx * tick, sy1 - g.ny * tick);
     ctx.lineTo(sx1 + g.nx * tick, sy1 + g.ny * tick);
     ctx.stroke();
-    // 中點垂直外浮標籤（白底黑字，供平面圖上易讀）
+    // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方）
     const label = dimensionLabel(g.len, opts.metersPerPt);
-    const off = fspt * 0.7;
-    const lx = g.mx + g.nx * off;
-    const ly = g.my + g.ny * off;
+    const lp = dimensionLabelPos(e);
+    const lx = lp?.x ?? g.mx;
+    const ly = lp?.y ?? g.my;
     const [lsx, lsy] = worldToScreen(v, lx, ly);
     ctx.save();
     ctx.font = `${fs}px ${fontStack(e.fontFamily)}`;
@@ -263,7 +263,7 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
       ctx.lineWidth = Math.max(1, e.borderWidth * s);
       ctx.strokeRect(bx, by, bw, bh);
     }
-    ctx.fillStyle = e.stroke;
+    ctx.fillStyle = e.labelColor ?? e.stroke;
     ctx.fillText(label, lsx, lsy);
     ctx.restore();
     return;

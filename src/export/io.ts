@@ -1,7 +1,7 @@
 import type { DocStore } from "../engine/document";
 import { orderedDrawList } from "../engine/document";
 import { renderEntity } from "../engine/renderer";
-import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom } from "../engine/geometry";
+import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom, dimensionLabelPos } from "../engine/geometry";
 import type { BBox } from "../engine/geometry";
 import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, measureTextWidth, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
@@ -105,10 +105,11 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
     if (!g) return "";
     const fs = e.fontSize ?? 12;
     const tick = fs * 0.5;
-    const off = fs * 0.7;
-    const lx = g.mx + g.nx * off;
-    const ly = g.my + g.ny * off;
+    const lp = dimensionLabelPos(e);
+    const lx = lp?.x ?? g.mx;
+    const ly = lp?.y ?? g.my;
     const label = dimensionLabel(g.len, metersPerPt);
+    const labelFill = e.labelColor ?? e.stroke;
     const tw = measureTextWidth(label, fs, e.fontFamily);
     const padX = fs * 0.15;
     const padY = fs * 0.15;
@@ -129,7 +130,7 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
         : "";
     const line = `<path d="M${fmt(g.x0)} ${fmt(g.y0)} L${fmt(g.x1)} ${fmt(g.y1)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
     const ticks = `<path d="M${fmt(g.x0 - g.nx * tick)} ${fmt(g.y0 - g.ny * tick)} L${fmt(g.x0 + g.nx * tick)} ${fmt(g.y0 + g.ny * tick)} M${fmt(g.x1 - g.nx * tick)} ${fmt(g.y1 - g.ny * tick)} L${fmt(g.x1 + g.nx * tick)} ${fmt(g.y1 + g.ny * tick)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}"/>`;
-    const labelG = `<g>${bgRect}${borderRect}<text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${e.stroke}" font-family="${fontStack(e.fontFamily).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
+    const labelG = `<g>${bgRect}${borderRect}<text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${labelFill}" font-family="${fontStack(e.fontFamily).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
     return line + ticks + labelG;
   }
 

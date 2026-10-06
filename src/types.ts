@@ -71,6 +71,10 @@ export interface VecEntity {
   borderColor?: string;
   /** 文字塊邊框寬（pt） */
   borderWidth?: number;
+  /** 距離標註文字顏色（未設 = 跟隨線條色 stroke） */
+  labelColor?: string;
+  /** 距離標註標籤在線的哪一側（above = 法線反方向/上方、below = 法線方向/下方，預設 below） */
+  labelSide?: "above" | "below";
   origin: "pdf" | "user";
   layerId: string;
   /** 群組（組件）id：同組圖元整體選取/移動/刪除 */
