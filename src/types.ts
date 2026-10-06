@@ -84,6 +84,8 @@ export interface VecEntity {
   dimArrowStyle?: DimensionArrowStyle;
   /** 距離標註箭頭大小倍率（預設 1 = 隨字號標準比例） */
   dimArrowScale?: number;
+  /** 距離標註線條（主線＋端點）不透明度 0–1（預設 1 = 完全不透明） */
+  lineOpacity?: number;
   origin: "pdf" | "user";
   layerId: string;
   /** 群組（組件）id：同組圖元整體選取/移動/刪除 */

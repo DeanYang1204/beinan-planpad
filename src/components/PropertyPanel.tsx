@@ -161,6 +161,34 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
               </button>
             ))}
           </div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500 flex justify-between">
+            <span>線條不透明度</span>
+            <span className="text-neutral-400">{Math.round((first.lineOpacity ?? 1) * 100)}%</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round((first.lineOpacity ?? 1) * 100)}
+              onChange={(e) =>
+                store.updateStyle(first.id, { lineOpacity: parseInt(e.target.value, 10) / 100 })
+              }
+              className="flex-1"
+            />
+            <button
+              onClick={() => store.updateStyle(first.id, { lineOpacity: undefined })}
+              className={`px-1.5 py-0.5 rounded border text-[10px] leading-none ${
+                first.lineOpacity === undefined
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-500 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              }`}
+              title="回復完全不透明"
+            >
+              預設
+            </button>
+          </div>
           <div className="mt-3 mb-1 text-xs text-neutral-500">箭頭樣式</div>
           <div className="flex flex-wrap gap-1">
             {(

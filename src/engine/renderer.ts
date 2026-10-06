@@ -213,6 +213,10 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     const fspt = e.fontSize ?? 12;
     const fs = fspt * s;
     const lw = Math.max(e.width * s, minW);
+    // 線條（主線＋端點）不透明度獨立於文字（標籤維持自身不透明度）
+    const lineOp = e.lineOpacity ?? 1;
+    ctx.save();
+    if (lineOp < 1) ctx.globalAlpha = lineOp;
     ctx.strokeStyle = e.stroke;
     ctx.lineWidth = lw;
     ctx.setLineDash([]);
@@ -257,6 +261,7 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
         }
       }
     }
+    ctx.restore(); // 結束線條不透明度（標籤不受影響）
     // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方、labelPrefix 為文字前綴）
     const label = dimensionLabelText(g.len, opts.metersPerPt, e.labelPrefix);
     const lp = dimensionLabelPos(e);

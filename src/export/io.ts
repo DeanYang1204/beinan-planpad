@@ -151,7 +151,10 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
       }
     }
     const labelG = `<g>${bgRect}${borderRect}<text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${labelFill}" font-family="${fontStack(e.fontFamily).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
-    return line + decor + labelG;
+    // 線條（主線＋端點）不透明度獨立於文字標籤
+    const lineOp = e.lineOpacity ?? 1;
+    const lineG = lineOp < 1 ? `<g opacity="${fmt(lineOp)}">${line}${decor}</g>` : line + decor;
+    return lineG + labelG;
   }
 
   if (e.kind === "text") {

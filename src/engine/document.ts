@@ -701,10 +701,10 @@ export class DocStore {
   }
 
   /** 更新樣式（顏色/線寬/虛線/填充/無邊框/文字塊樣式）；改描邊色時同步所屬圖層色塊 */
-  updateStyle(id: string, patch: Partial<Pick<VecEntity, "stroke" | "width" | "dash" | "fill" | "noStroke" | "headScale" | "arrowStyle" | "bend" | "bgColor" | "bgOpacity" | "fontFamily" | "borderColor" | "borderWidth" | "vertical" | "labelColor" | "labelSide" | "labelPrefix" | "dimArrowStyle" | "dimArrowScale">>) {
+  updateStyle(id: string, patch: Partial<Pick<VecEntity, "stroke" | "width" | "dash" | "fill" | "noStroke" | "headScale" | "arrowStyle" | "bend" | "bgColor" | "bgOpacity" | "fontFamily" | "borderColor" | "borderWidth" | "vertical" | "labelColor" | "labelSide" | "labelPrefix" | "dimArrowStyle" | "dimArrowScale" | "lineOpacity">>) {
     const e = this.byId(id);
     if (!e) return;
-    const before = { stroke: e.stroke, width: e.width, dash: e.dash, fill: e.fill, noStroke: e.noStroke, headScale: e.headScale, arrowStyle: e.arrowStyle, bend: e.bend, bgColor: e.bgColor, bgOpacity: e.bgOpacity, fontFamily: e.fontFamily, borderColor: e.borderColor, borderWidth: e.borderWidth, vertical: e.vertical, labelColor: e.labelColor, labelSide: e.labelSide, labelPrefix: e.labelPrefix, dimArrowStyle: e.dimArrowStyle, dimArrowScale: e.dimArrowScale };
+    const before = { stroke: e.stroke, width: e.width, dash: e.dash, fill: e.fill, noStroke: e.noStroke, headScale: e.headScale, arrowStyle: e.arrowStyle, bend: e.bend, bgColor: e.bgColor, bgOpacity: e.bgOpacity, fontFamily: e.fontFamily, borderColor: e.borderColor, borderWidth: e.borderWidth, vertical: e.vertical, labelColor: e.labelColor, labelSide: e.labelSide, labelPrefix: e.labelPrefix, dimArrowStyle: e.dimArrowStyle, dimArrowScale: e.dimArrowScale, lineOpacity: e.lineOpacity };
     // 文字塊樣式變更需重算 bbox（底色/邊框塊與選取框對齊）；箭頭樣式變更同理（彎曲/直角路徑超出起訖連線）
     const textKeys = ["bgColor", "bgOpacity", "fontFamily", "borderColor", "borderWidth", "vertical"] as const;
     const isTextStyle =
