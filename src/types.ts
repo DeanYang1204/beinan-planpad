@@ -75,6 +75,8 @@ export interface VecEntity {
   labelColor?: string;
   /** 距離標註標籤在線的哪一側（above = 法線反方向/上方、below = 法線方向/下方，預設 below） */
   labelSide?: "above" | "below";
+  /** 距離標註文字前綴（如「高」「寬」，顯示在公尺數前；未設 = 無前綴） */
+  labelPrefix?: string;
   origin: "pdf" | "user";
   layerId: string;
   /** 群組（組件）id：同組圖元整體選取/移動/刪除 */
@@ -289,4 +291,9 @@ export function formatMeters(m: number): string {
 export function dimensionLabel(ptLen: number, metersPerPt?: number): string {
   if (metersPerPt && metersPerPt > 0) return formatMeters(ptLen * metersPerPt);
   return "未校準";
+}
+
+/** 距離標註完整標籤文字（含前綴，如「高4.3 M」） */
+export function dimensionLabelText(ptLen: number, metersPerPt: number | undefined, prefix?: string): string {
+  return (prefix ?? "") + dimensionLabel(ptLen, metersPerPt);
 }

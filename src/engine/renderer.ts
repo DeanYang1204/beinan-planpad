@@ -1,6 +1,6 @@
 // ============ 渲染器（時間切片 + 視口裁剪） ============
 import type { PlanDoc, VecEntity, Viewport } from "../types";
-import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
+import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabelText } from "../types";
 import type { DocStore } from "./document";
 import type { BBox } from "./geometry";
 import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom, dimensionLabelPos, dimensionArrows } from "./geometry";
@@ -238,8 +238,8 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
         ctx.fill();
       }
     }
-    // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方）
-    const label = dimensionLabel(g.len, opts.metersPerPt);
+    // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方、labelPrefix 為文字前綴）
+    const label = dimensionLabelText(g.len, opts.metersPerPt, e.labelPrefix);
     const lp = dimensionLabelPos(e);
     const lx = lp?.x ?? g.mx;
     const ly = lp?.y ?? g.my;

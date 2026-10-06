@@ -4,7 +4,7 @@ import { renderEntity } from "../engine/renderer";
 import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom, dimensionLabelPos, dimensionArrows } from "../engine/geometry";
 import type { BBox } from "../engine/geometry";
 import type { PlanDoc, VecEntity, Viewport } from "../types";
-import { fontStack, measureTextBlock, measureTextWidth, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
+import { fontStack, measureTextBlock, measureTextWidth, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabelText } from "../types";
 import { PDFDocument } from "pdf-lib";
 
 /** 內容包圍盒：所有「可見實體」的聯集外框（含描邊外擴＋邊距）。無內容時退回整頁 */
@@ -107,7 +107,7 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
     const lp = dimensionLabelPos(e);
     const lx = lp?.x ?? g.mx;
     const ly = lp?.y ?? g.my;
-    const label = dimensionLabel(g.len, metersPerPt);
+    const label = dimensionLabelText(g.len, metersPerPt, e.labelPrefix);
     const labelFill = e.labelColor ?? e.stroke;
     const tw = measureTextWidth(label, fs, e.fontFamily);
     const padX = fs * 0.15;

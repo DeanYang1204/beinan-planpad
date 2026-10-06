@@ -14,6 +14,7 @@ interface BboxEntity {
   w?: number;
   h?: number;
   userRot?: number;
+  labelPrefix?: string;
 }
 
 /** 距離標註幾何：起訖點、垂直單位向量、長度、中點 */
@@ -77,9 +78,9 @@ export function dimensionArrows(e: { pts: number[]; fontSize?: number }): {
 export function entityBboxRaw(e: BboxEntity): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   if (e.kind === "dimension") {
-    // 距離標註：兩端點 bbox + 標籤（垂直外浮）與刻度外擴
+    // 距離標註：兩端點 bbox + 標籤（垂直外浮，前綴會加寬文字）與箭頭外擴
     const fs = e.fontSize ?? 12;
-    const pad = fs * 1.5;
+    const pad = fs * 1.5 + (e.labelPrefix?.length ?? 0) * fs;
     return [
       Math.min(e.pts[0], e.pts[2]) - pad,
       Math.min(e.pts[1], e.pts[3]) - pad,

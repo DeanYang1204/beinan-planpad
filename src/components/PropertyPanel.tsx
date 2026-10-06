@@ -194,6 +194,28 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
               ↓ 線條下方
             </button>
           </div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500">文字前綴</div>
+          <div className="flex gap-1">
+            {["", "高", "寬", "長"].map((p) => (
+              <button
+                key={p || "none"}
+                onClick={() => store.updateStyle(first.id, { labelPrefix: p || undefined })}
+                className={`flex-1 px-2 py-1.5 rounded border text-xs ${
+                  (first.labelPrefix ?? "") === p
+                    ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                    : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+                }`}
+              >
+                {p || "無"}
+              </button>
+            ))}
+            <input
+              value={first.labelPrefix ?? ""}
+              onChange={(ev) => store.updateStyle(first.id, { labelPrefix: ev.target.value || undefined })}
+              placeholder="自訂"
+              className="w-14 px-1.5 py-1 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-xs"
+            />
+          </div>
           <div className="mt-3 mb-1 text-xs text-neutral-500">字型</div>
           <select
             value={first.fontFamily ?? ""}
