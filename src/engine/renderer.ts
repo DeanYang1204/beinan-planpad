@@ -238,20 +238,30 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     const ly = g.my + g.ny * off;
     const [lsx, lsy] = worldToScreen(v, lx, ly);
     ctx.save();
-    ctx.font = `${fs}px ${fontStack(undefined)}`;
+    ctx.font = `${fs}px ${fontStack(e.fontFamily)}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const tw = ctx.measureText(label).width;
     const padX = fspt * 0.15 * s;
     const padY = fspt * 0.15 * s;
+    const bx = lsx - tw / 2 - padX;
+    const by = lsy - fs / 2 - padY;
+    const bw = tw + padX * 2;
+    const bh = fs + padY * 2;
     // 底色可調（與文字一致：bgColor 空 = 無底色、bgOpacity 控制不透明度）
     if (e.bgColor) {
       const bgOp = e.bgOpacity ?? 1;
       ctx.save();
       if (bgOp < 1) ctx.globalAlpha = bgOp;
       ctx.fillStyle = e.bgColor;
-      ctx.fillRect(lsx - tw / 2 - padX, lsy - fs / 2 - padY, tw + padX * 2, fs + padY * 2);
+      ctx.fillRect(bx, by, bw, bh);
       ctx.restore();
+    }
+    // 文字塊邊框（與文字一致：borderColor + borderWidth）
+    if (e.borderColor && e.borderWidth) {
+      ctx.strokeStyle = e.borderColor;
+      ctx.lineWidth = Math.max(1, e.borderWidth * s);
+      ctx.strokeRect(bx, by, bw, bh);
     }
     ctx.fillStyle = e.stroke;
     ctx.fillText(label, lsx, lsy);

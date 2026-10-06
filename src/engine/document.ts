@@ -750,10 +750,10 @@ export class DocStore {
     });
   }
 
-  /** 修改文字字號 */
+  /** 修改文字字號（文字 / 距離標註共用） */
   resizeText(id: string, size: number) {
     const e = this.byId(id);
-    if (!e || e.kind !== "text") return;
+    if (!e || (e.kind !== "text" && e.kind !== "dimension")) return;
     const before = e.fontSize;
     this.push({
       label: "字號",

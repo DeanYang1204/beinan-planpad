@@ -146,6 +146,28 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
               </button>
             ))}
           </div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500">字號 {first.fontSize ?? 12}pt</div>
+          <input
+            type="range"
+            min={0.5}
+            max={72}
+            step={0.5}
+            value={first.fontSize ?? 12}
+            onChange={(e) => store.resizeText(first.id, parseFloat(e.target.value))}
+            className="w-full"
+          />
+          <div className="mt-3 mb-1 text-xs text-neutral-500">字型</div>
+          <select
+            value={first.fontFamily ?? ""}
+            onChange={(ev) => store.updateStyle(first.id, { fontFamily: ev.target.value || undefined })}
+            className="w-full px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-xs"
+          >
+            {FONTS.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label}
+              </option>
+            ))}
+          </select>
           <div className="mt-3 mb-1 text-xs text-neutral-500">文字底色</div>
           <BgPicker
             value={first.bgColor ?? ""}
@@ -170,6 +192,33 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
               />
             </>
           )}
+          <div className="mt-3 mb-1 text-xs text-neutral-500">文字塊邊框</div>
+          <BgPicker
+            value={first.borderColor ?? ""}
+            border
+            onChange={(c) =>
+              store.updateStyle(first.id, {
+                borderColor: c || undefined,
+                borderWidth: c ? first.borderWidth || 1 : undefined,
+              })
+            }
+          />
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {[1, 2, 3, 4].map((w) => (
+              <button
+                key={w}
+                disabled={!first.borderColor}
+                onClick={() => store.updateStyle(first.id, { borderWidth: w })}
+                className={`w-8 h-7 rounded border text-xs disabled:opacity-40 ${
+                  (first.borderWidth ?? 1) === w && first.borderColor
+                    ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                    : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+                }`}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
         </div>
       ) : single && first.kind === "text" ? (
         <div>
