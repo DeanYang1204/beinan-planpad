@@ -16,9 +16,34 @@ interface BboxEntity {
   userRot?: number;
 }
 
+/** 距離標註幾何：起訖點、垂直單位向量、長度、中點 */
+export function dimensionGeom(e: { pts: number[] }): {
+  x0: number; y0: number; x1: number; y1: number;
+  nx: number; ny: number; len: number; mx: number; my: number;
+} | null {
+  if (e.pts.length < 4) return null;
+  const x0 = e.pts[0], y0 = e.pts[1], x1 = e.pts[2], y1 = e.pts[3];
+  const dx = x1 - x0, dy = y1 - y0;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-9) return null;
+  const nx = -dy / len, ny = dx / len;
+  return { x0, y0, x1, y1, nx, ny, len, mx: (x0 + x1) / 2, my: (y0 + y1) / 2 };
+}
+
 /** 未旋轉的 entity 包圍盒（不含 userRot） */
 export function entityBboxRaw(e: BboxEntity): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  if (e.kind === "dimension") {
+    // 距離標註：兩端點 bbox + 標籤（垂直外浮）與刻度外擴
+    const fs = e.fontSize ?? 12;
+    const pad = fs * 1.5;
+    return [
+      Math.min(e.pts[0], e.pts[2]) - pad,
+      Math.min(e.pts[1], e.pts[3]) - pad,
+      Math.max(e.pts[0], e.pts[2]) + pad,
+      Math.max(e.pts[1], e.pts[3]) + pad,
+    ];
+  }
   if (e.kind === "image") {
     const x = e.pts[0], y = e.pts[1];
     const w = e.w ?? 100, h = e.h ?? 100;
@@ -268,6 +293,16 @@ export function arrowRenderPoints(e: { pts: number[]; width?: number; headScale?
 /** 計算 entity 到點的最小距離（用於 hit-test） */
 export function distToEntity(e: VecEntity, px: number, py: number, tolerance: number): number {
   const tol = tolerance + Math.max(e.width, 1);
+  if (e.kind === "dimension") {
+    const g = dimensionGeom(e);
+    if (!g) return Infinity;
+    // 標籤命中（外浮於中點垂直方向，半徑約字號）
+    const fs = e.fontSize ?? 12;
+    const off = fs * 0.7;
+    const lx = g.mx + g.nx * off, ly = g.my + g.ny * off;
+    if (Math.hypot(px - lx, py - ly) <= fs + 2) return 0;
+    return pointSegDist(px, py, g.x0, g.y0, g.x1, g.y1) <= tol ? 0 : Infinity;
+  }
   if (e.kind === "text" || e.kind === "image") {
     const b = entityBbox(e);
     if (!pointInBbox([px, py], bboxExpand(b, 2))) return Infinity;

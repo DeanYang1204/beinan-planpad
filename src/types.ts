@@ -35,7 +35,8 @@ export type EntityKind =
   | "star"
   | "trapezoid"
   | "text"
-  | "image";
+  | "image"
+  | "dimension";
 
 /** 箭頭樣式：直線 / 彎曲（弧線）/ 直角（Z 形）/ 雙向（兩端箭頭） */
 export type ArrowStyle = "straight" | "curved" | "elbow" | "both";
@@ -122,6 +123,8 @@ export interface PlanDoc {
   /** 圖層組列表（可選，舊檔無此欄位） */
   layerGroups?: LayerGroup[];
   entities: VecEntity[];
+  /** 距離標註比例：1 world pt = 多少公尺（校準後設定；未設定 = 距離標註顯示「未校準」） */
+  metersPerPt?: number;
 }
 
 export interface Viewport {
@@ -266,4 +269,20 @@ export function hexToRgb(hex: string): [number, number, number] {
   if (!m) return [0, 0, 0];
   const n = parseInt(m[1], 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** 格式化公尺數值為標註文字（去尾零，如 3.6 米、12.35 米、0.45 米） */
+export function formatMeters(m: number): string {
+  let s: string;
+  const a = Math.abs(m);
+  if (a >= 100) s = m.toFixed(1);
+  else if (a >= 1) s = m.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+  else s = m.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
+  return s + " 米";
+}
+
+/** 距離標註的文字：已校準（有 metersPerPt）→ 公尺；未校準 → 提示 */
+export function dimensionLabel(ptLen: number, metersPerPt?: number): string {
+  if (metersPerPt && metersPerPt > 0) return formatMeters(ptLen * metersPerPt);
+  return "未校準";
 }

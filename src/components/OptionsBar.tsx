@@ -5,6 +5,8 @@ interface Props {
   tool: ToolId;
   style: DrawStyle;
   onStyleChange: (patch: Partial<DrawStyle>) => void;
+  metersPerPt?: number;
+  onClearScale?: () => void;
 }
 
 const COLORS = ["#000000", "#e53935", "#1e88e5", "#43a047", "#ffb300", "#8e24aa", "#00acc1", "#6d4c41", "#f06292", "#78909c"];
@@ -19,7 +21,7 @@ const DASHES = [
 /** 繪圖工具（會畫出新圖元的工具） */
 const DRAW_TOOLS: ToolId[] = ["rect", "roundrect", "ellipse", "line", "polygon", "star", "arrow", "polyline", "arc"];
 
-export default function OptionsBar({ tool, style, onStyleChange }: Props) {
+export default function OptionsBar({ tool, style, onStyleChange, metersPerPt, onClearScale }: Props) {
   // 選取類工具：顯示群組提示
   if (tool === "select" || tool === "anchor") {
     return (
@@ -68,12 +70,39 @@ export default function OptionsBar({ tool, style, onStyleChange }: Props) {
     );
   }
 
-  // 測量工具
+  // 測量工具（距離標註）
   if (tool === "measure") {
     return (
       <div className="h-9 shrink-0 flex items-center gap-3 px-3 bg-white border-b border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 text-xs text-neutral-500 overflow-x-auto whitespace-nowrap">
-        <span className="text-neutral-400 shrink-0">測量</span>
-        <span>拖曳量測距離（Shift 吸附 45°）</span>
+        <span className="text-neutral-400 shrink-0">距離標註</span>
+        <span>拖曳畫出距離線（Shift 吸附 45°），標註公尺數</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-neutral-400">字號</span>
+          <input
+            type="range"
+            min={8}
+            max={48}
+            step={1}
+            value={style.fontSize}
+            onChange={(e) => onStyleChange({ fontSize: parseFloat(e.target.value) })}
+            className="w-24"
+          />
+          <span className="text-neutral-600 dark:text-neutral-300 w-8">{style.fontSize}pt</span>
+        </div>
+        {metersPerPt ? (
+          <>
+            <span className="text-emerald-600 dark:text-emerald-400 shrink-0">✓ 已校準比例</span>
+            <button
+              onClick={onClearScale}
+              className="px-2 py-0.5 rounded border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+              title="清除比例，下次畫線重新校準"
+            >
+              清除
+            </button>
+          </>
+        ) : (
+          <span className="text-amber-600 dark:text-amber-400 shrink-0">未校準：畫線後輸入實際公尺數</span>
+        )}
       </div>
     );
   }

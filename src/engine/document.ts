@@ -775,6 +775,14 @@ export class DocStore {
     if (layer) layer.locked = locked;
     this.emit();
   }
+  /** 設定距離標註比例（1 world pt = 多少公尺）；傳 undefined / 非正數 = 清除比例。非 undoable（同顯隱/鎖定） */
+  setScale(metersPerPt: number | undefined) {
+    if (!this.doc) return;
+    const after = metersPerPt !== undefined && metersPerPt > 0 ? metersPerPt : undefined;
+    if (this.doc.metersPerPt === after) return;
+    this.doc.metersPerPt = after;
+    this.emit();
+  }
   /** 設定單一圖層不透明度（0–1），undoable；連續調整同一圖層會合併為一步（避免滑桿拖動產生大量步驟） */
   setLayerOpacity(id: string, opacity: number) {
     if (!this.doc) return;

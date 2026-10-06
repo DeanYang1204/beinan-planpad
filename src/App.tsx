@@ -42,6 +42,7 @@ export default function App() {
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(true);
+  const [calibrate, setCalibrate] = useState<{ id: string; ptLength: number } | null>(null);
   const saveFlashRef = useRef<number | null>(null);
 
   // 訂閱 store 觸發重渲染
@@ -385,9 +386,15 @@ export default function App() {
         />
 
         <div className="flex-1 flex flex-col min-w-0">
-          <OptionsBar tool={tool} style={style} onStyleChange={(p) => setStyle((s) => ({ ...s, ...p }))} />
+          <OptionsBar
+            tool={tool}
+            style={style}
+            onStyleChange={(p) => setStyle((s) => ({ ...s, ...p }))}
+            metersPerPt={store.doc?.metersPerPt}
+            onClearScale={() => store.setScale(undefined)}
+          />
           <div className="flex-1 relative" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
-            <CanvasView store={store} tool={tool} style={style} apiRef={apiRef} onPickColor={(c) => setStyle((s) => ({ ...s, stroke: c }))} onToolChange={setTool} showGrid={showGrid} showCrosshair={showCrosshair} />
+            <CanvasView store={store} tool={tool} style={style} apiRef={apiRef} onPickColor={(c) => setStyle((s) => ({ ...s, stroke: c }))} onToolChange={setTool} showGrid={showGrid} showCrosshair={showCrosshair} onMeasureCreated={(id, ptLength) => setCalibrate({ id, ptLength })} />
 
           {/* 空白/載入狀態 */}
           {!loaded && !loading && (
@@ -449,6 +456,80 @@ export default function App() {
               <HistoryPanel store={store} />
             )}
           </div>
+        </div>
+      </div>
+
+      {/* 距離標註比例校準對話框 */}
+      {calibrate && (
+        <CalibrationDialog
+          ptLength={calibrate.ptLength}
+          onConfirm={(meters) => {
+            store.setScale(meters / calibrate.ptLength);
+            setCalibrate(null);
+          }}
+          onCancel={() => setCalibrate(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 距離標註比例校準：畫一條已知長度的線後，輸入其實際公尺數以推算比例 */
+function CalibrationDialog({
+  ptLength,
+  onConfirm,
+  onCancel,
+}: {
+  ptLength: number;
+  onConfirm: (meters: number) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const submit = () => {
+    const m = parseFloat(value);
+    if (isFinite(m) && m > 0) onConfirm(m);
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
+      <div
+        className="w-80 rounded-xl bg-white dark:bg-neutral-900 shadow-2xl ring-1 ring-neutral-200 dark:ring-neutral-700 p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="font-semibold text-sm mb-1">校準距離比例</div>
+        <p className="text-xs text-neutral-500 mb-4">
+          這條標註線實際是幾公尺？輸入後即可換算比例，之後所有距離標註都會自動顯示公尺數。
+        </p>
+        <div className="flex items-center gap-2 mb-4">
+          <input
+            autoFocus
+            type="number"
+            min={0}
+            step={0.01}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+              else if (e.key === "Escape") onCancel();
+            }}
+            placeholder="例如 5.2"
+            className="flex-1 px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-sm"
+          />
+          <span className="text-sm text-neutral-500">米</span>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 rounded border border-neutral-300 text-sm text-neutral-600 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
+          >
+            取消
+          </button>
+          <button
+            onClick={submit}
+            disabled={!(parseFloat(value) > 0)}
+            className="px-3 py-1.5 rounded bg-primary-600 text-white text-sm hover:bg-primary-700 disabled:opacity-40"
+          >
+            確定
+          </button>
         </div>
       </div>
     </div>

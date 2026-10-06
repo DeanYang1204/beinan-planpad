@@ -1,6 +1,7 @@
 import type { DocStore } from "../engine/document";
 import type { VecEntity } from "../types";
-import { FONTS } from "../types";
+import { FONTS, formatMeters } from "../types";
+import { useState } from "react";
 
 interface Props {
   store: DocStore;
@@ -112,7 +113,40 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
         </div>
       )}
 
-      {single && first.kind === "text" ? (
+      {single && first.kind === "dimension" ? (
+        <div>
+          <div className="text-xs text-neutral-500 mb-1">距離</div>
+          <div className="text-2xl font-bold tabular-nums">
+            {store.doc?.metersPerPt
+              ? formatMeters(
+                  Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1]) * store.doc.metersPerPt
+                )
+              : "未校準"}
+          </div>
+          <Recalibrate
+            store={store}
+            ptLength={Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1])}
+          />
+          <div className="mt-3 mb-1 text-xs text-neutral-500">顏色</div>
+          <ColorPicker value={first.stroke} onChange={(c) => store.updateStyle(first.id, { stroke: c })} />
+          <div className="mt-3 mb-1 text-xs text-neutral-500">線寬</div>
+          <div className="flex flex-wrap gap-1">
+            {WIDTHS.map((w) => (
+              <button
+                key={w}
+                onClick={() => store.updateStyle(first.id, { width: w })}
+                className={`w-8 h-8 rounded border text-xs ${
+                  first.width === w
+                    ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                    : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+                }`}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : single && first.kind === "text" ? (
         <div>
           <div className="text-xs text-neutral-500 mb-1">內容</div>
           <button
@@ -406,6 +440,41 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 重新校準比例：以此段距離為基準輸入實際公尺數，更新全域比例 */
+function Recalibrate({ store, ptLength }: { store: DocStore; ptLength: number }) {
+  const [value, setValue] = useState("");
+  const apply = () => {
+    const m = parseFloat(value);
+    if (isFinite(m) && m > 0) store.setScale(m / ptLength);
+    setValue("");
+  };
+  return (
+    <div className="mt-3">
+      <div className="text-xs text-neutral-500 mb-1">以此段重新校準比例</div>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          step={0.01}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && apply()}
+          placeholder="實際公尺"
+          className="flex-1 min-w-0 px-2 py-1 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-xs"
+        />
+        <span className="text-xs text-neutral-400 shrink-0">米</span>
+        <button
+          onClick={apply}
+          disabled={!(parseFloat(value) > 0)}
+          className="px-2 py-1 rounded border border-primary-600 bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 disabled:opacity-40 dark:bg-primary-900 dark:text-primary-200"
+        >
+          套用
+        </button>
+      </div>
     </div>
   );
 }

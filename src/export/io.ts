@@ -1,10 +1,10 @@
 import type { DocStore } from "../engine/document";
 import { orderedDrawList } from "../engine/document";
 import { renderEntity } from "../engine/renderer";
-import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox } from "../engine/geometry";
+import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom } from "../engine/geometry";
 import type { BBox } from "../engine/geometry";
 import type { PlanDoc, VecEntity, Viewport } from "../types";
-import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT } from "../types";
+import { fontStack, measureTextBlock, measureTextWidth, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabel } from "../types";
 import { PDFDocument } from "pdf-lib";
 
 /** 內容包圍盒：所有「可見實體」的聯集外框（含描邊外擴＋邊距）。無內容時退回整頁 */
@@ -69,7 +69,7 @@ export function exportSVG(store: DocStore): string {
   for (const l of doc.layers) layerOp.set(l.id, l.opacity ?? 1);
   for (const e of orderedDrawList(doc)) {
     const op = layerOp.get(e.layerId) ?? 1;
-    const svg = entityToSVG(e);
+    const svg = entityToSVG(e, doc.metersPerPt);
     if (op < 1) {
       // 文字/圖片若已自帶 <g transform>，將 opacity 加到外層 <g>（SVG 允許 transform+opacity 並存）
       parts.push(`<g opacity="${fmt(op)}">${svg}</g>`);
@@ -99,7 +99,25 @@ function strokeAttr(e: VecEntity): string {
   return ` stroke="${e.stroke}" stroke-width="${fmt(e.width)}"`;
 }
 
-function entityToSVG(e: VecEntity): string {
+function entityToSVG(e: VecEntity, metersPerPt?: number): string {
+  if (e.kind === "dimension") {
+    const g = dimensionGeom(e);
+    if (!g) return "";
+    const fs = e.fontSize ?? 12;
+    const tick = fs * 0.5;
+    const off = fs * 0.7;
+    const lx = g.mx + g.nx * off;
+    const ly = g.my + g.ny * off;
+    const label = dimensionLabel(g.len, metersPerPt);
+    const tw = measureTextWidth(label, fs);
+    const padX = fs * 0.15;
+    const padY = fs * 0.15;
+    const line = `<path d="M${fmt(g.x0)} ${fmt(g.y0)} L${fmt(g.x1)} ${fmt(g.y1)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
+    const ticks = `<path d="M${fmt(g.x0 - g.nx * tick)} ${fmt(g.y0 - g.ny * tick)} L${fmt(g.x0 + g.nx * tick)} ${fmt(g.y0 + g.ny * tick)} M${fmt(g.x1 - g.nx * tick)} ${fmt(g.y1 - g.ny * tick)} L${fmt(g.x1 + g.nx * tick)} ${fmt(g.y1 + g.ny * tick)}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}"/>`;
+    const labelG = `<g><rect x="${fmt(lx - tw / 2 - padX)}" y="${fmt(ly - fs / 2 - padY)}" width="${fmt(tw + padX * 2)}" height="${fmt(fs + padY * 2)}" fill="#ffffff"/><text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${e.stroke}" font-family="${fontStack(undefined).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
+    return line + ticks + labelG;
+  }
+
   if (e.kind === "text") {
     const fs = e.fontSize ?? 12;
     const rot = e.rot ? (e.rot * 180) / Math.PI : 0;
@@ -271,6 +289,7 @@ export function renderDocToCanvas(doc: PlanDoc, scale: number, crop?: BBox): HTM
     selection: new Set<string>(),
     minStrokeW: 0.3,
     layerOpacity,
+    metersPerPt: doc.metersPerPt,
   };
   // 依圖層堆疊順序繪製（與畫布一致：由最下層畫到最上層）
   for (const e of orderedDrawList(doc)) renderEntity(ctx, e, opts as any);

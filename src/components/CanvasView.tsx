@@ -27,6 +27,7 @@ const KIND_LABEL: Record<string, string> = {
   trapezoid: "梯形",
   text: "文字",
   image: "圖片",
+  dimension: "距離標註",
 };
 
 export interface CanvasApi {
@@ -52,6 +53,8 @@ interface Props {
   showGrid?: boolean;
   /** 是否顯示 XY 十字準星 */
   showCrosshair?: boolean;
+  /** 測量工具建立距離標註後回調（尚未校準比例時，供上層彈出校準輸入） */
+  onMeasureCreated?: (id: string, ptLength: number) => void;
 }
 
 type DragState =
@@ -96,7 +99,7 @@ function applyConstraint(start: [number, number], cur: [number, number], tool: S
   return [start[0] + sx, start[1] + sy];
 }
 
-export default function CanvasView({ store, tool, style, apiRef, onHoverChange, onPickColor, onToolChange, showGrid = true, showCrosshair = true }: Props) {
+export default function CanvasView({ store, tool, style, apiRef, onHoverChange, onPickColor, onToolChange, showGrid = true, showCrosshair = true, onMeasureCreated }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -207,6 +210,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         crosshair: showCrosshairRef.current ? crosshairRef.current : null,
         midHandleStretch: toolRef.current === "select",
         layerOpacity,
+        metersPerPt: store.doc?.metersPerPt,
       };
 
       if (baseDirty.current) {
@@ -312,9 +316,12 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         }
         break;
       }
-      case "measure":
-        out = { ghost: mk([...d.startW, ...d.curW], "line") };
+      case "measure": {
+        const gh = mk([...d.startW, ...d.curW], "dimension");
+        gh.fontSize = styleRef.current.fontSize;
+        out = { ghost: gh };
         break;
+      }
       default:
         out = { ghost: null };
     }
@@ -1117,22 +1124,46 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         dragRef.current = null;
         break;
       }
-      case "line":
-      case "arrow":
       case "measure": {
+        const ex = d.curW[0];
+        const ey = d.curW[1];
+        const len = Math.hypot(ex - d.startW[0], ey - d.startW[1]);
+        if (len > 1) {
+          const e: VecEntity = {
+            id: genId(),
+            kind: "dimension",
+            pts: [...d.startW, ex, ey],
+            stroke: styleRef.current.stroke,
+            width: styleRef.current.width,
+            fontSize: styleRef.current.fontSize,
+            origin: "user",
+            layerId: store.ensureDrawLayer(styleRef.current.stroke, KIND_LABEL.dimension),
+          };
+          store.addEntity(e);
+          store.setSelection([e.id]);
+          // 尚未校準比例 → 通知上層彈出校準輸入
+          if (!store.doc?.metersPerPt) onMeasureCreated?.(e.id, len);
+          onToolChange?.("select");
+        }
+        snapRef.current = null;
+        dragRef.current = null;
+        break;
+      }
+      case "line":
+      case "arrow": {
         // 使用拖動過程中的 curW（已含 SHIFT 約束/端點吸附），避免「先鬆 Shift 再鬆滑鼠」時跳變
         const ex = d.curW[0];
         const ey = d.curW[1];
         if (Math.hypot(ex - d.startW[0], ey - d.startW[1]) > 1) {
           const e: VecEntity = {
             id: genId(),
-            kind: d.kind === "measure" ? "line" : d.kind,
+            kind: d.kind,
             pts: [...d.startW, ex, ey],
             stroke: styleRef.current.stroke,
             width: styleRef.current.width,
             dash: styleRef.current.dash || undefined,
             origin: "user",
-            layerId: store.ensureDrawLayer(styleRef.current.stroke, d.kind === "measure" ? KIND_LABEL.line : KIND_LABEL[d.kind] ?? "標註"),
+            layerId: store.ensureDrawLayer(styleRef.current.stroke, KIND_LABEL[d.kind] ?? "標註"),
           };
           store.addEntity(e);
           store.setSelection([e.id]);
