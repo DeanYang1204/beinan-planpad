@@ -97,6 +97,10 @@ export default function LayerPanel({ store }: Props) {
     setSelectedIds(new Set());
   }
 
+  function duplicateSelected() {
+    store.duplicateLayers([...selectedIds]);
+  }
+
   function toggleCollapse(gid: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -164,6 +168,13 @@ export default function LayerPanel({ store }: Props) {
             title="解鎖所選圖層"
           >
             🔓 解鎖
+          </button>
+          <button
+            onClick={duplicateSelected}
+            className="px-2 py-1 rounded text-xs border border-neutral-300 hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-700"
+            title="複製所選圖層（連同其內容，副本置於來源下方）"
+          >
+            📋 複製
           </button>
           {selCount >= 2 && (
             <button
@@ -256,7 +267,7 @@ export default function LayerPanel({ store }: Props) {
       </div>
 
       <div className="px-3 py-1.5 text-[10px] text-neutral-400 border-t border-neutral-200 dark:border-neutral-800">
-        拖曳調上下層 · 拖到群組收納 · 雙擊改名 · 🗑 刪除
+        拖曳調上下層 · 拖到群組收納 · 雙擊改名 · 📋 複製 · 🗑 刪除
       </div>
 
       {/* 操作中圖層的不透明度滑桿（點擊圖層列後出現） */}
@@ -618,6 +629,17 @@ function LayerRow({
         title={layer.locked ? "解除鎖定" : "鎖定此圖層（鎖定後不可選取/編輯）"}
       >
         {layer.locked ? "🔒" : "🔓"}
+      </button>
+      {/* 複製按鈕 */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          store.duplicateLayers([layer.id]);
+        }}
+        className="w-6 h-6 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 text-center text-xs shrink-0 text-neutral-400 hover:text-primary-600"
+        title="複製此圖層（連同其內容，副本置於下方）"
+      >
+        📋
       </button>
       {/* 刪除按鈕 */}
       <button

@@ -921,6 +921,69 @@ export class DocStore {
     return true;
   }
 
+  /** 複製一個或多個圖層（連同其下所有實體複製一份），undoable。
+   *  新圖層插在來源圖層正下方（面板顯示於來源下一列、堆疊上在來源下方），
+   *  沿用來源圖層的 color/width/visible/locked/isFill/opacity/groupId；名稱加「 複製」後綴。 */
+  duplicateLayers(ids: string[]): boolean {
+    if (!this.doc || ids.length === 0) return false;
+    const idSet = new Set(ids);
+    const srcLayers = this.doc.layers.filter((l) => idSet.has(l.id));
+    if (srcLayers.length === 0) return false;
+
+    // 新圖層 id 沿用 user-N 流水號（與 repairLayerIds / ensureDrawLayer 同規則，避免撞號）
+    let maxN = 0;
+    for (const l of this.doc.layers) {
+      const m = /^user-(\d+)$/.exec(l.id);
+      if (m) maxN = Math.max(maxN, parseInt(m[1], 10));
+    }
+
+    // 預先為每個來源圖層建立「新圖層 + 複製實體」快照
+    const plan: { srcId: string; newLayer: Layer; newEntities: VecEntity[] }[] = [];
+    for (const src of srcLayers) {
+      const newId = `user-${++maxN}`;
+      const newLayer: Layer = {
+        id: newId,
+        name: `${src.name} 複製`,
+        color: src.color,
+        width: src.width,
+        visible: src.visible,
+        locked: src.locked,
+        isFill: src.isFill,
+        count: src.count,
+        groupId: src.groupId,
+        opacity: src.opacity,
+      };
+      const srcEntities = this.doc.entities.filter((e) => e.layerId === src.id);
+      const newEntities: VecEntity[] = srcEntities.map((e) => {
+        const copy: VecEntity = { ...e, id: genId(), layerId: newId };
+        if (e.pts) copy.pts = e.pts.slice();
+        return copy;
+      });
+      plan.push({ srcId: src.id, newLayer, newEntities });
+    }
+
+    const self = this;
+    this.push({
+      label: "複製圖層",
+      redo: () => {
+        const d = self.doc!;
+        for (const p of plan) {
+          const idx = d.layers.findIndex((l) => l.id === p.srcId);
+          d.layers.splice(idx + 1, 0, p.newLayer);
+          d.entities.push(...p.newEntities);
+        }
+      },
+      undo: () => {
+        const d = self.doc!;
+        const newLayerIds = new Set(plan.map((p) => p.newLayer.id));
+        d.layers = d.layers.filter((l) => !newLayerIds.has(l.id));
+        const newEntityIds = new Set(plan.flatMap((p) => p.newEntities.map((e) => e.id)));
+        d.entities = d.entities.filter((e) => !newEntityIds.has(e.id));
+      },
+    });
+    return true;
+  }
+
   /** 把多個圖層收納為一個新圖層組（PS 群組資料夾），undoable */
   groupLayers(ids: string[]): boolean {
     if (!this.doc || ids.length < 2) return false;
