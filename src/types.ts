@@ -41,6 +41,9 @@ export type EntityKind =
 /** 箭頭樣式：直線 / 彎曲（弧線）/ 直角（Z 形）/ 雙向（兩端箭頭） */
 export type ArrowStyle = "straight" | "curved" | "elbow" | "both";
 
+/** 距離標註端點樣式：實心箭頭 / 空心箭頭 / 斜線（建築短斜刻度）/ 工字型（垂直刻度）/ 圓點 / 方塊 */
+export type DimensionArrowStyle = "arrow" | "open" | "tick" | "ibeam" | "dot" | "box";
+
 /** 可編輯圖元：PDF 提取的線/文字，或使用者繪製的標註，統一處理 */
 export interface VecEntity {
   id: string;
@@ -77,6 +80,10 @@ export interface VecEntity {
   labelSide?: "above" | "below";
   /** 距離標註文字前綴（如「高」「寬」，顯示在公尺數前；未設 = 無前綴） */
   labelPrefix?: string;
+  /** 距離標註端點樣式（預設 arrow 實心三角；open=空心、tick=斜線、ibeam=工字型、dot=圓點、box=方塊） */
+  dimArrowStyle?: DimensionArrowStyle;
+  /** 距離標註箭頭大小倍率（預設 1 = 隨字號標準比例） */
+  dimArrowScale?: number;
   origin: "pdf" | "user";
   layerId: string;
   /** 群組（組件）id：同組圖元整體選取/移動/刪除 */

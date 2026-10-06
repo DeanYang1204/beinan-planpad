@@ -3,7 +3,7 @@ import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabelText } from "../types";
 import type { DocStore } from "./document";
 import type { BBox } from "./geometry";
-import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom, dimensionLabelPos, dimensionArrows } from "./geometry";
+import { entityBbox, entityBboxRaw, shapeVerts, bendHandlePos, rotateHandlePos, arrowBendHandlePos, arrowHeadGeom, arrowRenderPoints, dimensionGeom, dimensionLabelPos, dimensionEnds } from "./geometry";
 
 export interface RenderOpts {
   deviceRatio: number;
@@ -216,26 +216,45 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     ctx.strokeStyle = e.stroke;
     ctx.lineWidth = lw;
     ctx.setLineDash([]);
-    // 雙向箭頭：主線（兩端內縮讓位給箭頭）＋兩端實心箭頭（朝線內）
-    const ar = dimensionArrows(e);
-    if (ar) {
-      const [mx0, my0] = worldToScreen(v, ar.mainFrom[0], ar.mainFrom[1]);
-      const [mx1, my1] = worldToScreen(v, ar.mainTo[0], ar.mainTo[1]);
+    // 端點：主線（箭頭/空心箭頭會內縮讓位）＋兩端樣式（實心/空心箭頭、斜線、工字、圓點、方塊）
+    const ends = dimensionEnds(e);
+    if (ends) {
+      const [mx0, my0] = worldToScreen(v, ends.mainFrom[0], ends.mainFrom[1]);
+      const [mx1, my1] = worldToScreen(v, ends.mainTo[0], ends.mainTo[1]);
       ctx.beginPath();
       ctx.moveTo(mx0, my0);
       ctx.lineTo(mx1, my1);
       ctx.stroke();
       ctx.fillStyle = e.stroke;
-      for (const a of ar.arrows) {
-        const [tx, ty] = worldToScreen(v, a.tip[0], a.tip[1]);
-        const [w1x, w1y] = worldToScreen(v, a.w1[0], a.w1[1]);
-        const [w2x, w2y] = worldToScreen(v, a.w2[0], a.w2[1]);
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(w1x, w1y);
-        ctx.lineTo(w2x, w2y);
-        ctx.closePath();
-        ctx.fill();
+      for (const en of ends.ends) {
+        if (en.kind === "arrow" || en.kind === "open") {
+          const [tx, ty] = worldToScreen(v, en.tip![0], en.tip![1]);
+          const [w1x, w1y] = worldToScreen(v, en.w1![0], en.w1![1]);
+          const [w2x, w2y] = worldToScreen(v, en.w2![0], en.w2![1]);
+          ctx.beginPath();
+          ctx.moveTo(tx, ty);
+          ctx.lineTo(w1x, w1y);
+          ctx.lineTo(w2x, w2y);
+          ctx.closePath();
+          if (en.kind === "arrow") ctx.fill();
+          else ctx.stroke(); // 空心箭頭：只描輪廓
+        } else if (en.kind === "tick") {
+          const [ax, ay] = worldToScreen(v, en.a![0], en.a![1]);
+          const [bx2, by2] = worldToScreen(v, en.b![0], en.b![1]);
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(bx2, by2);
+          ctx.stroke();
+        } else if (en.kind === "dot") {
+          const [cx, cy] = worldToScreen(v, en.c![0], en.c![1]);
+          ctx.beginPath();
+          ctx.arc(cx, cy, en.r! * s, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (en.kind === "box") {
+          const [cx, cy] = worldToScreen(v, en.c![0], en.c![1]);
+          const hs = en.hs! * s;
+          ctx.fillRect(cx - hs, cy - hs, hs * 2, hs * 2);
+        }
       }
     }
     // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方、labelPrefix 為文字前綴）

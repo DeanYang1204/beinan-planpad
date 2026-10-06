@@ -161,6 +161,57 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
               </button>
             ))}
           </div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500">箭頭樣式</div>
+          <div className="flex flex-wrap gap-1">
+            {(
+              [
+                ["arrow", "實心箭頭"],
+                ["open", "空心箭頭"],
+                ["tick", "斜線"],
+                ["ibeam", "工字型"],
+                ["dot", "圓點"],
+                ["box", "方塊"],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => store.updateStyle(first.id, { dimArrowStyle: v })}
+                className={`px-2 py-1 rounded border text-xs ${
+                  (first.dimArrowStyle ?? "arrow") === v
+                    ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                    : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 mb-1 text-xs text-neutral-500 flex justify-between">
+            <span>箭頭大小</span>
+            <span className="text-neutral-400">×{(first.dimArrowScale ?? 1).toFixed(1)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0.5}
+              max={3}
+              step={0.1}
+              value={first.dimArrowScale ?? 1}
+              onChange={(e) => store.updateStyle(first.id, { dimArrowScale: parseFloat(e.target.value) })}
+              className="flex-1"
+            />
+            <button
+              onClick={() => store.updateStyle(first.id, { dimArrowScale: undefined })}
+              className={`px-1.5 py-0.5 rounded border text-[10px] leading-none ${
+                first.dimArrowScale === undefined
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-500 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              }`}
+              title="回復預設大小（隨字號比例）"
+            >
+              預設
+            </button>
+          </div>
           <div className="mt-3 mb-1 text-xs text-neutral-500">字號 {first.fontSize ?? 12}pt</div>
           <input
             type="range"

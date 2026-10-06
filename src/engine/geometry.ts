@@ -74,13 +74,80 @@ export function dimensionArrows(e: { pts: number[]; fontSize?: number }): {
   };
 }
 
+/** 距離標註端點繪製單元（world 座標） */
+export interface DimEnd {
+  /** arrow/open = 實心/空心三角；tick = 直線段（斜線或工字刻度共用）；dot = 圓點；box = 方塊 */
+  kind: "arrow" | "open" | "tick" | "dot" | "box";
+  tip?: [number, number];
+  w1?: [number, number];
+  w2?: [number, number];
+  a?: [number, number];
+  b?: [number, number];
+  c?: [number, number];
+  r?: number; // dot 半徑（world pt）
+  hs?: number; // box 半邊長（world pt）
+}
+
+/** 距離標註的端點幾何（world）：依 dimArrowStyle 產生兩端端點，並回傳主線起訖點（箭頭/空心箭頭會內縮讓位）。 */
+export function dimensionEnds(e: {
+  pts: number[];
+  fontSize?: number;
+  dimArrowStyle?: string;
+  dimArrowScale?: number;
+}): { mainFrom: [number, number]; mainTo: [number, number]; ends: DimEnd[] } | null {
+  const g = dimensionGeom(e);
+  if (!g) return null;
+  const fs = e.fontSize ?? 12;
+  const sc = e.dimArrowScale ?? 1;
+  const style = (e.dimArrowStyle ?? "arrow") as "arrow" | "open" | "tick" | "ibeam" | "dot" | "box";
+  const headLen = Math.max(8, fs * 0.7) * sc;
+  const halfW = Math.max(4, fs * 0.35) * sc;
+  const dx = (g.x1 - g.x0) / g.len, dy = (g.y1 - g.y0) / g.len;
+  const px = -dy, py = dx; // 垂直方向
+  const ends: DimEnd[] = [];
+  const push = (tip: [number, number], toward: number) => {
+    const bx = tip[0] + dx * headLen * toward;
+    const by = tip[1] + dy * headLen * toward;
+    if (style === "arrow" || style === "open") {
+      ends.push({
+        kind: style,
+        tip,
+        w1: [bx + px * halfW, by + py * halfW] as [number, number],
+        w2: [bx - px * halfW, by - py * halfW] as [number, number],
+      });
+    } else if (style === "tick") {
+      // 斜線（建築 45° 短斜刻度）：端點 → 內縮 + 垂直偏移 headLen
+      ends.push({ kind: "tick", a: tip, b: [bx + px * headLen, by + py * headLen] });
+    } else if (style === "ibeam") {
+      // 工字型：垂直短刻度貫穿端點（舊工字樣式）
+      ends.push({
+        kind: "tick",
+        a: [tip[0] - px * halfW, tip[1] - py * halfW],
+        b: [tip[0] + px * halfW, tip[1] + py * halfW],
+      });
+    } else if (style === "dot") {
+      ends.push({ kind: "dot", c: tip, r: halfW * 0.75 });
+    } else if (style === "box") {
+      ends.push({ kind: "box", c: tip, hs: halfW });
+    }
+  };
+  push([g.x0, g.y0], 1);
+  push([g.x1, g.y1], -1);
+  const inset = style === "arrow" || style === "open" ? headLen : 0;
+  return {
+    mainFrom: [g.x0 + dx * inset, g.y0 + dy * inset],
+    mainTo: [g.x1 - dx * inset, g.y1 - dy * inset],
+    ends,
+  };
+}
+
 /** 未旋轉的 entity 包圍盒（不含 userRot） */
 export function entityBboxRaw(e: BboxEntity): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   if (e.kind === "dimension") {
-    // 距離標註：兩端點 bbox + 標籤（垂直外浮，前綴會加寬文字）與箭頭外擴
+    // 距離標註：兩端點 bbox + 標籤（垂直外浮，前綴會加寬文字）與箭頭外擴（含大小倍率）
     const fs = e.fontSize ?? 12;
-    const pad = fs * 1.5 + (e.labelPrefix?.length ?? 0) * fs;
+    const pad = fs * 2 + (e.labelPrefix?.length ?? 0) * fs;
     return [
       Math.min(e.pts[0], e.pts[2]) - pad,
       Math.min(e.pts[1], e.pts[3]) - pad,

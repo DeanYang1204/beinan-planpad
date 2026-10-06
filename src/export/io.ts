@@ -1,7 +1,7 @@
 import type { DocStore } from "../engine/document";
 import { orderedDrawList } from "../engine/document";
 import { renderEntity } from "../engine/renderer";
-import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom, dimensionLabelPos, dimensionArrows } from "../engine/geometry";
+import { shapeVerts, arrowHeadGeom, arrowRenderPoints, entityBbox, dimensionGeom, dimensionLabelPos, dimensionEnds } from "../engine/geometry";
 import type { BBox } from "../engine/geometry";
 import type { PlanDoc, VecEntity, Viewport } from "../types";
 import { fontStack, measureTextBlock, measureTextWidth, toVerticalForms, TEXT_LINE_HEIGHT, dimensionLabelText } from "../types";
@@ -127,18 +127,31 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
       e.borderColor && e.borderWidth
         ? `<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="none" stroke="${e.borderColor}" stroke-width="${fmt(e.borderWidth)}"/>`
         : "";
-    // 雙向箭頭：主線（兩端內縮）＋兩端實心箭頭（朝線內）
-    const ar = dimensionArrows(e);
+    // 端點：主線（箭頭/空心箭頭內縮）＋兩端樣式（實心/空心箭頭、斜線、工字、圓點、方塊）
+    const ends = dimensionEnds(e);
     let line = "";
-    let arrowPolys = "";
-    if (ar) {
-      line = `<path d="M${fmt(ar.mainFrom[0])} ${fmt(ar.mainFrom[1])} L${fmt(ar.mainTo[0])} ${fmt(ar.mainTo[1])}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
-      arrowPolys = ar.arrows
-        .map((a) => `<polygon points="${fmt(a.tip[0])},${fmt(a.tip[1])} ${fmt(a.w1[0])},${fmt(a.w1[1])} ${fmt(a.w2[0])},${fmt(a.w2[1])}" fill="${e.stroke}"/>`)
-        .join("");
+    let decor = "";
+    if (ends) {
+      line = `<path d="M${fmt(ends.mainFrom[0])} ${fmt(ends.mainFrom[1])} L${fmt(ends.mainTo[0])} ${fmt(ends.mainTo[1])}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
+      for (const en of ends.ends) {
+        if (en.kind === "arrow" || en.kind === "open") {
+          const pts = `${fmt(en.tip![0])},${fmt(en.tip![1])} ${fmt(en.w1![0])},${fmt(en.w1![1])} ${fmt(en.w2![0])},${fmt(en.w2![1])}`;
+          decor +=
+            en.kind === "arrow"
+              ? `<polygon points="${pts}" fill="${e.stroke}"/>`
+              : `<polygon points="${pts}" fill="none" stroke="${e.stroke}" stroke-width="${fmt(Math.max(1, e.width))}" stroke-linejoin="round"/>`;
+        } else if (en.kind === "tick") {
+          decor += `<path d="M${fmt(en.a![0])} ${fmt(en.a![1])} L${fmt(en.b![0])} ${fmt(en.b![1])}" stroke="${e.stroke}" stroke-width="${fmt(e.width)}" stroke-linecap="round"/>`;
+        } else if (en.kind === "dot") {
+          decor += `<circle cx="${fmt(en.c![0])}" cy="${fmt(en.c![1])}" r="${fmt(en.r!)}" fill="${e.stroke}"/>`;
+        } else if (en.kind === "box") {
+          const hs = en.hs!;
+          decor += `<rect x="${fmt(en.c![0] - hs)}" y="${fmt(en.c![1] - hs)}" width="${fmt(hs * 2)}" height="${fmt(hs * 2)}" fill="${e.stroke}"/>`;
+        }
+      }
     }
     const labelG = `<g>${bgRect}${borderRect}<text x="${fmt(lx)}" y="${fmt(ly)}" text-anchor="middle" dominant-baseline="central" font-size="${fmt(fs)}" fill="${labelFill}" font-family="${fontStack(e.fontFamily).replace(/"/g, "'")}">${escapeXml(label)}</text></g>`;
-    return line + arrowPolys + labelG;
+    return line + decor + labelG;
   }
 
   if (e.kind === "text") {

@@ -701,15 +701,16 @@ export class DocStore {
   }
 
   /** 更新樣式（顏色/線寬/虛線/填充/無邊框/文字塊樣式）；改描邊色時同步所屬圖層色塊 */
-  updateStyle(id: string, patch: Partial<Pick<VecEntity, "stroke" | "width" | "dash" | "fill" | "noStroke" | "headScale" | "arrowStyle" | "bend" | "bgColor" | "bgOpacity" | "fontFamily" | "borderColor" | "borderWidth" | "vertical" | "labelColor" | "labelSide" | "labelPrefix">>) {
+  updateStyle(id: string, patch: Partial<Pick<VecEntity, "stroke" | "width" | "dash" | "fill" | "noStroke" | "headScale" | "arrowStyle" | "bend" | "bgColor" | "bgOpacity" | "fontFamily" | "borderColor" | "borderWidth" | "vertical" | "labelColor" | "labelSide" | "labelPrefix" | "dimArrowStyle" | "dimArrowScale">>) {
     const e = this.byId(id);
     if (!e) return;
-    const before = { stroke: e.stroke, width: e.width, dash: e.dash, fill: e.fill, noStroke: e.noStroke, headScale: e.headScale, arrowStyle: e.arrowStyle, bend: e.bend, bgColor: e.bgColor, bgOpacity: e.bgOpacity, fontFamily: e.fontFamily, borderColor: e.borderColor, borderWidth: e.borderWidth, vertical: e.vertical, labelColor: e.labelColor, labelSide: e.labelSide, labelPrefix: e.labelPrefix };
+    const before = { stroke: e.stroke, width: e.width, dash: e.dash, fill: e.fill, noStroke: e.noStroke, headScale: e.headScale, arrowStyle: e.arrowStyle, bend: e.bend, bgColor: e.bgColor, bgOpacity: e.bgOpacity, fontFamily: e.fontFamily, borderColor: e.borderColor, borderWidth: e.borderWidth, vertical: e.vertical, labelColor: e.labelColor, labelSide: e.labelSide, labelPrefix: e.labelPrefix, dimArrowStyle: e.dimArrowStyle, dimArrowScale: e.dimArrowScale };
     // 文字塊樣式變更需重算 bbox（底色/邊框塊與選取框對齊）；箭頭樣式變更同理（彎曲/直角路徑超出起訖連線）
     const textKeys = ["bgColor", "bgOpacity", "fontFamily", "borderColor", "borderWidth", "vertical"] as const;
     const isTextStyle =
       (textKeys.some((k) => k in patch) && e.kind === "text") ||
-      (("arrowStyle" in patch || "headScale" in patch || "bend" in patch) && e.kind === "arrow");
+      (("arrowStyle" in patch || "headScale" in patch || "bend" in patch) && e.kind === "arrow") ||
+      (("dimArrowStyle" in patch || "dimArrowScale" in patch) && e.kind === "dimension");
     // 直書切換：橫書錨點=baseline（文字在錨點上方）、直書錨點=頂端（文字在錨點下方）。
     // 切換時平移錨點讓文字塊「原地轉向」不跳位；undo/redo 以增量回滾（與拖移命令相容）。
     let anchorDy = 0;
