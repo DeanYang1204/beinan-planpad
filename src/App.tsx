@@ -59,6 +59,7 @@ export default function App() {
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
   const [calibrate, setCalibrate] = useState<{ id: string; ptLength: number } | null>(null);
   const saveFlashRef = useRef<number | null>(null);
 
@@ -405,21 +406,34 @@ export default function App() {
             列印
           </button>
 
-          <div className="relative group">
-            <button className="px-2.5 py-1.5 rounded-md border border-neutral-300 text-sm whitespace-nowrap hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800">
-              匯出 ▾
+          <div className="relative z-30">
+            <button
+              onClick={() => setExportOpen((v) => !v)}
+              className={`relative z-40 px-2.5 py-1.5 rounded-md border border-neutral-300 text-sm whitespace-nowrap hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800 ${exportOpen ? "bg-neutral-100 dark:bg-neutral-800" : ""}`}
+              title="選擇匯出格式（點擊展開／收合）"
+            >
+              匯出 {exportOpen ? "▴" : "▾"}
             </button>
-            <div className="hidden group-hover:block absolute right-0 top-full mt-1 w-28 bg-white border border-neutral-200 rounded-md shadow-lg z-30 dark:bg-neutral-900 dark:border-neutral-700">
-              {(["svg", "png", "pdf", "json"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => doExport(t)}
-                  className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                >
-                  {t.toUpperCase()}
-                </button>
-              ))}
-            </div>
+            {exportOpen && (
+              <>
+                {/* 點擊選單外部任意處關閉 */}
+                <div className="fixed inset-0 z-20" onClick={() => setExportOpen(false)} />
+                <div className="absolute right-0 top-full w-28 bg-white border border-neutral-200 rounded-md shadow-lg z-30 dark:bg-neutral-900 dark:border-neutral-700">
+                  {(["svg", "png", "pdf", "json"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => {
+                        setExportOpen(false);
+                        doExport(t);
+                      }}
+                      className="block w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    >
+                      {t.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
