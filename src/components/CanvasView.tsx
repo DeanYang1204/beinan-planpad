@@ -10,7 +10,7 @@ import {
   type RenderState,
 } from "../engine/renderer";
 import { entityBbox, pointInShape, pointInPolygon, snapPoint, bendHandlePos, rotateHandlePos, arrowBendHandlePos, type BBox } from "../engine/geometry";
-import type { ToolId, VecEntity, Viewport } from "../types";
+import type { ToolId, VecEntity, Viewport, PlanDoc } from "../types";
 import { genId, measureTextWidth, fontStack, TEXT_LINE_HEIGHT } from "../types";
 
 /** 工具 → 圖層名稱（一圖一層，依工具命名） */
@@ -533,16 +533,16 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
     [store]
   );
 
-  // 載入後自動 fit
+  // 載入後自動 fit（每次換新文件都重新 fit，而非只在首次）
+  const fitRef = useRef<{ lastDoc: PlanDoc | null }>({ lastDoc: null });
   useEffect(() => {
     return store.subscribe(() => {
-      if (store.doc && !fitRef.current.done) {
-        fitRef.current.done = true;
+      if (store.doc && store.doc !== fitRef.current.lastDoc) {
+        fitRef.current.lastDoc = store.doc;
         fit();
       }
     });
   }, [store, fit]);
-  const fitRef = useRef({ done: false });
 
   // ---------- 暴露 API ----------
   useEffect(() => {

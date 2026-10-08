@@ -1,7 +1,7 @@
 import type { DocStore } from "../engine/document";
 import type { VecEntity } from "../types";
 import { FONTS, formatMeters } from "../types";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface Props {
   store: DocStore;
@@ -477,6 +477,8 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
         </div>
       ) : single && first.kind === "image" ? (
         <div>
+          <div className="text-xs text-neutral-500 mb-1">圖片</div>
+          <ReplaceImage store={store} id={first.id} />
           <div className="mt-3 mb-1 text-xs text-neutral-500">旋轉角度</div>
           <RotateControl
             value={(first.userRot ?? 0) * (180 / Math.PI)}
@@ -653,6 +655,36 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 更換圖片內容：選檔後讀取 dataURL＋自然尺寸，保持錨點與寬度、高度依新圖長寬比更新 */
+function ReplaceImage({ store, id }: { store: DocStore; id: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const onChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => store.replaceImage(id, dataUrl, img.naturalWidth || 1, img.naturalHeight || 1);
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div>
+      <button
+        onClick={() => inputRef.current?.click()}
+        className="w-full px-2 py-1.5 rounded border border-primary-600 bg-primary-50 text-primary-700 text-xs hover:bg-primary-100 dark:bg-primary-900 dark:text-primary-200"
+        title="換成另一張圖片（保持位置與寬度，高度依新圖比例）"
+      >
+        更換圖片
+      </button>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onChange} />
     </div>
   );
 }

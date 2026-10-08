@@ -343,6 +343,30 @@ export class DocStore {
     });
   }
 
+  /** 更換圖片內容（保持左上錨點與寬度，高度依新圖長寬比更新），undoable */
+  replaceImage(id: string, dataUrl: string, naturalW: number, naturalH: number) {
+    const e = this.byId(id);
+    if (!e || e.kind !== "image") return;
+    const beforeData = e.imageData;
+    const beforeW = e.w ?? 100;
+    const beforeH = e.h ?? 100;
+    const ratio = naturalH / naturalW || 1;
+    const newW = beforeW;
+    const newH = newW * ratio;
+    const self = this;
+    this.push({
+      label: "更換圖片",
+      redo: () => {
+        const t = self.byId(id);
+        if (t) { t.imageData = dataUrl; t.w = newW; t.h = newH; t.bbox = entityBbox(t); }
+      },
+      undo: () => {
+        const t = self.byId(id);
+        if (t) { t.imageData = beforeData; t.w = beforeW; t.h = beforeH; t.bbox = entityBbox(t); }
+      },
+    });
+  }
+
   /** 頂點編輯：拖動線段端點改變形狀（before/after 為整條實體的 pts 快照） */
   commitGeometry(id: string, beforePts: number[], afterPts: number[]) {
     // 無變化則不記錄（避免單擊錨點未拖動也產生空歷史，讓雙擊刪錨點的 undo 乾淨）

@@ -9,12 +9,29 @@ import HistoryPanel from "./components/HistoryPanel";
 import { exportSVG, exportPNG, exportPDF, exportJSON, printDoc, downloadBlob, downloadText, contentBbox, renderDocToCanvas } from "./export/io";
 import { saveProject, loadProject, normalizeProject } from "./engine/persistence";
 import { arrowHeadGeom, arrowBendHandlePos, arrowRenderPoints, entityBbox } from "./engine/geometry";
-import type { ToolId } from "./types";
+import { genId } from "./types";
+import type { ToolId, PlanDoc } from "./types";
 
 interface WorkerMsg {
   type: "done" | "error";
   result?: { doc: any; stats: any };
   message?: string;
+}
+
+/** 讀取圖片檔為 dataURL，並回傳自然尺寸（px）；供「開啟圖片 → 於其上標註」使用 */
+function readImageFile(file: File): Promise<{ dataUrl: string; w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onload = () => resolve({ dataUrl, w: img.naturalWidth || 800, h: img.naturalHeight || 600 });
+      img.onerror = () => reject(new Error("圖片載入失敗"));
+      img.src = dataUrl;
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("讀取失敗"));
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function App() {
@@ -154,7 +171,7 @@ export default function App() {
 
   async function handleFile(file: File) {
     const name = file.name.toLowerCase();
-    // 專案檔（.planpad / .json）→ 直接匯入；其餘 → PDF 解析
+    // 專案檔（.planpad / .json）→ 直接匯入
     if (name.endsWith(".planpad") || name.endsWith(".json")) {
       try {
         const text = await file.text();
@@ -172,10 +189,71 @@ export default function App() {
       }
       return;
     }
+    // 圖片檔（照片/截圖等）→ 開啟為可標註的文件（圖片作底圖、註記在上層）
+    if (file.type.startsWith("image/")) {
+      await openImageAsDoc(file);
+      return;
+    }
+    // 其餘 → PDF 解析
     setLoading(true);
     setError("");
     const buf = await file.arrayBuffer();
     workerRef.current?.postMessage({ data: buf });
+  }
+
+  /** 把圖片開成一份「可於其上標註」的文件：圖片以自然尺寸鋪滿畫布作為鎖定底圖，註記畫在上方標註圖層 */
+  async function openImageAsDoc(file: File) {
+    try {
+      const { dataUrl, w, h } = await readImageFile(file);
+      const doc: PlanDoc = {
+        pageW: w,
+        pageH: h,
+        layerGroups: [],
+        // doc.layers[0] = 最上層（面板顯示在最上方）：標註在上、底圖在下
+        layers: [
+          {
+            id: "user",
+            name: "標註",
+            color: "#e53935",
+            width: 2,
+            visible: true,
+            locked: false,
+            isFill: false,
+            count: 0,
+          },
+          {
+            id: "background",
+            name: "底圖",
+            color: "#000000",
+            width: 1,
+            visible: true,
+            locked: true,
+            isFill: false,
+            count: 1,
+          },
+        ],
+        entities: [
+          {
+            id: genId(),
+            kind: "image",
+            pts: [0, 0],
+            stroke: "#000000",
+            width: 1,
+            origin: "user",
+            layerId: "background",
+            imageData: dataUrl,
+            w,
+            h,
+          },
+        ],
+      };
+      store.loadDoc(doc);
+      setLoaded(true);
+      setError("");
+      setStats(`已載入圖片 ${w}×${h}px，可用文字／形狀／箭頭／測量工具於其上標註`);
+    } catch (err) {
+      setError("圖片載入失敗：" + (err as Error).message);
+    }
   }
 
   function doSaveProject() {
@@ -258,9 +336,9 @@ export default function App() {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="px-2.5 py-1.5 rounded-md bg-primary-600 text-white text-sm whitespace-nowrap shadow-sm hover:bg-primary-700 active:bg-primary-800"
-            title="上傳 PDF 平面圖開始編輯"
+            title="上傳 PDF 平面圖或圖片開始編輯"
           >
-            上傳 PDF
+            上傳 PDF / 圖片
           </button>
         </div>
 
@@ -402,8 +480,8 @@ export default function App() {
               <span className="inline-flex items-center rounded-2xl bg-white px-6 py-4 shadow-xl ring-1 ring-neutral-200/60 dark:ring-white/10 mb-6">
                 <img src={import.meta.env.BASE_URL + "logo.png"} alt="" className="h-16 w-auto" />
               </span>
-              <div className="text-lg font-medium text-neutral-500">上傳 PDF 平面圖開始編輯</div>
-              <div className="text-sm mt-1.5">支援拖放檔案至此，或點擊「上傳 PDF」</div>
+              <div className="text-lg font-medium text-neutral-500">上傳 PDF 平面圖或圖片開始編輯</div>
+              <div className="text-sm mt-1.5">支援拖放 PDF 或圖片至此；圖片會作為底圖，可在其上用文字／形狀／箭頭／測量工具標註</div>
               <div className="mt-5 flex items-center gap-2 text-[11px]">
                 {["選取/移動", "繪圖標註", "圖層管理", "填充樣式", "測量列印"].map((f, i) => (
                   <span key={f} className="flex items-center gap-2">
