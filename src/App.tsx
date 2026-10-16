@@ -7,6 +7,7 @@ import LayerPanel from "./components/LayerPanel";
 import PropertyPanel from "./components/PropertyPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import { exportSVG, exportPNG, exportPDF, exportJSON, printDoc, downloadBlob, downloadText, contentBbox, renderDocToCanvas } from "./export/io";
+import { exportDXF } from "./export/dxf";
 import { saveProject, loadProject, normalizeProject } from "./engine/persistence";
 import { arrowHeadGeom, arrowBendHandlePos, arrowRenderPoints, entityBbox } from "./engine/geometry";
 import { genId } from "./types";
@@ -41,7 +42,7 @@ export default function App() {
   // 暴露到 window 供測試/診斷
   (window as any).__planpad = store;
   (window as any).__planpad_geom = { arrowHeadGeom, arrowBendHandlePos, arrowRenderPoints, entityBbox };
-  (window as any).__planpad_io = { exportSVG, contentBbox, exportPDF, exportPNG, renderDocToCanvas };
+  (window as any).__planpad_io = { exportSVG, contentBbox, exportPDF, exportPNG, renderDocToCanvas, exportDXF };
 
   const workerRef = useRef<Worker | null>(null);
   const apiRef = useRef<CanvasApi | null>(null);
@@ -59,6 +60,8 @@ export default function App() {
   const [saveState, setSaveState] = useState<"idle" | "saved" | "error">("idle");
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(true);
+  const [ortho, setOrtho] = useState(false);
+  const [snapEnabled, setSnapEnabled] = useState(true);
   const [exportOpen, setExportOpen] = useState(false);
   const [calibrate, setCalibrate] = useState<{ id: string; ptLength: number } | null>(null);
   const saveFlashRef = useRef<number | null>(null);
@@ -279,12 +282,18 @@ export default function App() {
     if (f) handleFile(f);
   }, []);
 
-  async function doExport(type: "svg" | "png" | "pdf" | "json") {
+  async function doExport(type: "svg" | "png" | "pdf" | "json" | "dxf") {
     if (!store.doc) return;
     if (type === "svg") {
       downloadText(exportSVG(store), "beinan-plan.svg", "image/svg+xml");
     } else if (type === "json") {
       downloadText(exportJSON(store), "beinan-plan.json", "application/json");
+    } else if (type === "dxf") {
+      try {
+        downloadText(exportDXF(store), "beinan-plan.dxf", "application/dxf");
+      } catch (err) {
+        setError("DXF 匯出失敗");
+      }
     } else if (type === "pdf") {
       try {
         const blob = await exportPDF(store);
@@ -377,6 +386,28 @@ export default function App() {
           >
             ✛ 準星
           </button>
+          <button
+            onClick={() => setOrtho((v) => !v)}
+            className={`px-2 py-1 rounded border text-sm ${
+              ortho
+                ? "border-primary-500 text-primary-600 bg-primary-50 dark:bg-primary-900/30"
+                : "border-neutral-300 text-neutral-500 hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+            }`}
+            title="正交鎖定（F8）：繪圖/移動鎖定水平垂直"
+          >
+            ⊥ 正交
+          </button>
+          <button
+            onClick={() => setSnapEnabled((v) => !v)}
+            className={`px-2 py-1 rounded border text-sm ${
+              snapEnabled
+                ? "border-primary-500 text-primary-600 bg-primary-50 dark:bg-primary-900/30"
+                : "border-neutral-300 text-neutral-500 hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-800"
+            }`}
+            title="物件捕捉（F9）：端點/中點/交點吸附"
+          >
+            ◎ 捕捉
+          </button>
         </div>
 
         <div className="w-px h-5 bg-neutral-200 dark:bg-neutral-700 mx-0.5" />
@@ -419,7 +450,7 @@ export default function App() {
                 {/* 點擊選單外部任意處關閉 */}
                 <div className="fixed inset-0 z-20" onClick={() => setExportOpen(false)} />
                 <div className="absolute right-0 top-full w-28 bg-white border border-neutral-200 rounded-md shadow-lg z-30 dark:bg-neutral-900 dark:border-neutral-700">
-                  {(["svg", "png", "pdf", "json"] as const).map((t) => (
+                  {(["svg", "png", "pdf", "dxf", "json"] as const).map((t) => (
                     <button
                       key={t}
                       onClick={() => {
@@ -486,7 +517,7 @@ export default function App() {
             onClearScale={() => store.setScale(undefined)}
           />
           <div className="flex-1 relative" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
-            <CanvasView store={store} tool={tool} style={style} apiRef={apiRef} onPickColor={(c) => setStyle((s) => ({ ...s, stroke: c }))} onToolChange={setTool} showGrid={showGrid} showCrosshair={showCrosshair} onMeasureCreated={(id, ptLength) => setCalibrate({ id, ptLength })} />
+            <CanvasView store={store} tool={tool} style={style} apiRef={apiRef} onPickColor={(c) => setStyle((s) => ({ ...s, stroke: c }))} onToolChange={setTool} showGrid={showGrid} showCrosshair={showCrosshair} onMeasureCreated={(id, ptLength) => setCalibrate({ id, ptLength })} ortho={ortho} snapEnabled={snapEnabled} onToggleOrtho={() => setOrtho((v) => !v)} onToggleSnap={() => setSnapEnabled((v) => !v)} />
 
           {/* 空白/載入狀態 */}
           {!loaded && !loading && (

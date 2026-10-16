@@ -9,7 +9,7 @@ import {
   type RenderOpts,
   type RenderState,
 } from "../engine/renderer";
-import { entityBbox, pointInShape, pointInPolygon, snapPoint, bendHandlePos, rotateHandlePos, arrowBendHandlePos, type BBox } from "../engine/geometry";
+import { entityBbox, pointInShape, pointInPolygon, snapPoint, bendHandlePos, rotateHandlePos, arrowBendHandlePos, shapeVerts, arrowRenderPoints, type BBox } from "../engine/geometry";
 import type { ToolId, VecEntity, Viewport, PlanDoc } from "../types";
 import { genId, measureTextWidth, fontStack, TEXT_LINE_HEIGHT } from "../types";
 
@@ -55,6 +55,13 @@ interface Props {
   showCrosshair?: boolean;
   /** 測量工具建立距離標註後回調（尚未校準比例時，供上層彈出校準輸入） */
   onMeasureCreated?: (id: string, ptLength: number) => void;
+  /** 正交鎖定（CAD Ortho，0/90°，優先於 SHIFT） */
+  ortho?: boolean;
+  /** 物件捕捉（端點/中點/交點） */
+  snapEnabled?: boolean;
+  /** F8/F9 切換回調（狀態由 App 管理） */
+  onToggleOrtho?: () => void;
+  onToggleSnap?: () => void;
 }
 
 type DragState =
@@ -82,14 +89,15 @@ type DragState =
 
 type ShapeTool = "line" | "arrow" | "rect" | "roundrect" | "ellipse" | "star";
 
-/** SHIFT 約束：直線/箭頭吸附到 0/45/90°…，矩形/橢圓/星型/梯形約束為正方形外框 */
-function applyConstraint(start: [number, number], cur: [number, number], tool: ShapeTool, shift: boolean): [number, number] {
-  if (!shift) return cur;
+/** 角度約束：直線/箭頭吸附到指定角度增量（steps=8 → 45°、steps=4 → 90°），矩形/橢圓/星型/梯形約束為正方形外框 */
+function applyConstraint(start: [number, number], cur: [number, number], tool: ShapeTool, constrain: boolean, steps = 8): [number, number] {
+  if (!constrain) return cur;
   const dx = cur[0] - start[0];
   const dy = cur[1] - start[1];
   if (tool === "line" || tool === "arrow") {
     const ang = Math.atan2(dy, dx);
-    const snapped = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
+    const step = (Math.PI * 2) / steps;
+    const snapped = Math.round(ang / step) * step;
     const len = Math.hypot(dx, dy);
     return [start[0] + Math.cos(snapped) * len, start[1] + Math.sin(snapped) * len];
   }
@@ -99,7 +107,53 @@ function applyConstraint(start: [number, number], cur: [number, number], tool: S
   return [start[0] + sx, start[1] + sy];
 }
 
-export default function CanvasView({ store, tool, style, apiRef, onHoverChange, onPickColor, onToolChange, showGrid = true, showCrosshair = true, onMeasureCreated }: Props) {
+/** 線段交點（兩條有限線段，平行或不相交回 null） */
+function segmentIntersect(a: [number, number], b: [number, number], c: [number, number], d: [number, number]): [number, number] | null {
+  const d1x = b[0] - a[0], d1y = b[1] - a[1];
+  const d2x = d[0] - c[0], d2y = d[1] - c[1];
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-9) return null;
+  const t = ((c[0] - a[0]) * d2y - (c[1] - a[1]) * d2x) / denom;
+  const u = ((c[0] - a[0]) * d1y - (c[1] - a[1]) * d1x) / denom;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return [a[0] + t * d1x, a[1] + t * d1y];
+}
+
+/** 展開實體為線段列表 [x0,y0,x1,y1, ...]，供捕捉（端點/中點/交點）使用 */
+function entitySegments(e: VecEntity): [number, number, number, number][] {
+  let pts: number[];
+  let closed = false;
+  if (e.kind === "arc") {
+    const p0 = [e.pts[0], e.pts[1]], p1 = [e.pts[2], e.pts[3]], p2 = [e.pts[4], e.pts[5]];
+    const N = 24;
+    const out: number[] = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, mt = 1 - t;
+      out.push(mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0], mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1]);
+    }
+    pts = out;
+  } else if (e.kind === "ellipse" || e.kind === "star" || e.kind === "trapezoid") {
+    pts = shapeVerts(e);
+    closed = true;
+  } else if (e.kind === "arrow") {
+    pts = arrowRenderPoints(e);
+  } else {
+    pts = e.pts;
+    closed = !!e.closed;
+  }
+  const n = pts.length / 2;
+  const segs: [number, number, number, number][] = [];
+  const segCount = closed ? n : n - 1;
+  for (let i = 0; i < segCount; i++) {
+    const j = (i + 1) % n;
+    segs.push([pts[i * 2], pts[i * 2 + 1], pts[j * 2], pts[j * 2 + 1]]);
+  }
+  return segs;
+}
+
+type SnapType = "endpoint" | "midpoint" | "intersection";
+
+export default function CanvasView({ store, tool, style, apiRef, onHoverChange, onPickColor, onToolChange, showGrid = true, showCrosshair = true, onMeasureCreated, ortho = false, snapEnabled = true, onToggleOrtho, onToggleSnap }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
@@ -110,6 +164,10 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
   const snapRef = useRef<[number, number] | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageInsertRef = useRef<[number, number] | null>(null);
+  // CAD 狀態列：座標顯示 + 精確座標輸入（直接改 DOM 避免 React 重渲染）
+  const coordRef = useRef<HTMLSpanElement>(null);
+  const coordInputRef = useRef<HTMLInputElement>(null);
+  const cursorWorldRef = useRef<[number, number] | null>(null);
   const baseState = useRef<RenderState>({ list: null, i: 0, viewKey: "" });
   const hoverRef = useRef<string | null>(null);
   const styleRef = useRef(style);
@@ -117,10 +175,14 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
   const crosshairRef = useRef<[number, number] | null>(null);
   const showGridRef = useRef(showGrid);
   const showCrosshairRef = useRef(showCrosshair);
+  const orthoRef = useRef(ortho);
+  const snapEnabledRef = useRef(snapEnabled);
   styleRef.current = style;
   toolRef.current = tool;
   showGridRef.current = showGrid;
   showCrosshairRef.current = showCrosshair;
+  orthoRef.current = ortho;
+  snapEnabledRef.current = snapEnabled;
 
   // 文字輸入框狀態
   const [textInput, setTextInput] = useState<{
@@ -240,6 +302,61 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
     return screenToWorld(viewRef.current, ev.clientX - rect.left, ev.clientY - rect.top);
   }
 
+  // ---------- CAD 狀態列：座標顯示 + 精確輸入 ----------
+  /** 依校準比例把 world pt 換算顯示值（有校準→公尺，無→pt） */
+  function formatCoord(w: [number, number]): string {
+    const mpp = store.doc?.metersPerPt;
+    if (mpp && mpp > 0) {
+      return `X ${(w[0] * mpp).toFixed(2)}　Y ${(w[1] * mpp).toFixed(2)}　m`;
+    }
+    return `X ${w[0].toFixed(1)}　Y ${w[1].toFixed(1)}`;
+  }
+  /** 即時更新座標顯示（直接改 DOM，零重渲染） */
+  function updateCoordDisplay() {
+    if (!coordRef.current) return;
+    const w = cursorWorldRef.current;
+    coordRef.current.textContent = w ? formatCoord(w) : "";
+  }
+  /** 選取群組的合併包圍盒 */
+  function selectionBbox(): [number, number, number, number] | null {
+    if (store.selection.size === 0) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const id of store.selection) {
+      const e = store.doc?.entities.find((x) => x.id === id);
+      if (!e) continue;
+      const b = e.bbox || entityBbox(e);
+      minX = Math.min(minX, b[0]); minY = Math.min(minY, b[1]);
+      maxX = Math.max(maxX, b[2]); maxY = Math.max(maxY, b[3]);
+    }
+    if (minX === Infinity) return null;
+    return [minX, minY, maxX, maxY];
+  }
+  /** 精確座標輸入：絕對 "x,y"（移動選取群組中心到該點）或相對 "@dx,dy"；已校準時輸入為公尺 */
+  function applyCoordInput() {
+    const raw = coordInputRef.current?.value.trim();
+    if (!raw || store.selection.size === 0) return;
+    const mpp = store.doc?.metersPerPt;
+    const rel = raw.startsWith("@");
+    const parts = (rel ? raw.slice(1) : raw).split(/[,\s]+/).map(Number);
+    if (parts.length < 2 || parts.some((n) => !isFinite(n))) return;
+    let x = parts[0], y = parts[1];
+    if (mpp && mpp > 0) { x /= mpp; y /= mpp; }
+    const ids = [...store.selection];
+    if (rel) {
+      store.moveLive(ids, x, y);
+      store.commitMove(ids, x, y);
+    } else {
+      const b = selectionBbox();
+      if (b) {
+        const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+        store.moveLive(ids, x - cx, y - cy);
+        store.commitMove(ids, x - cx, y - cy);
+      }
+    }
+    if (coordInputRef.current) coordInputRef.current.value = "";
+    markOverlayDirty();
+  }
+
   // ---------- 預覽圖元 ----------
   function ghostForOverlay(): Partial<RenderOpts> {
     const d = dragRef.current;
@@ -330,28 +447,55 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
   }
 
   // ---------- 命中測試 ----------
-  /** 找最近的既有圖元端點（供畫線時錨點銜接吸附） */
-  function findSnap(w: [number, number]): [number, number] | null {
-    const tol = 8 / viewRef.current.scale;
+  /** 物件捕捉：端點 > 中點 > 交點（分級優先），供所有繪圖工具吸附 */
+  function findSnapFull(w: [number, number]): { point: [number, number]; type: SnapType } | null {
+    if (!snapEnabledRef.current) return null;
+    const scale = viewRef.current.scale;
+    const tol = 8 / scale;
     const idx = store.getIndex();
-    const cand = idx.queryBBox([w[0] - tol, w[1] - tol, w[0] + tol, w[1] + tol]);
-    let best: [number, number] | null = null;
-    let bestD = tol;
+    const cand = idx.queryBBox([w[0] - tol * 3, w[1] - tol * 3, w[0] + tol * 3, w[1] + tol * 3]);
+    const segsAll: [number, number, number, number][] = [];
+    const visibles: VecEntity[] = [];
     for (const e of cand) {
       const layer = store.doc?.layers.find((l) => l.id === e.layerId);
       if (layer && (!layer.visible || layer.locked)) continue;
-      if (e.kind === "text" || e.kind === "ellipse" || e.kind === "star" || e.kind === "trapezoid") continue;
-      const n = e.pts.length / 2;
-      for (let i = 0; i < n; i++) {
-        if (e.kind === "arc" && i !== 0 && i !== n - 1) continue; // 弧線只吸起/終點
-        const d = Math.hypot(e.pts[i * 2] - w[0], e.pts[i * 2 + 1] - w[1]);
-        if (d < bestD) {
-          bestD = d;
-          best = [e.pts[i * 2], e.pts[i * 2 + 1]];
-        }
+      if (e.kind === "text" || e.kind === "image" || e.kind === "dimension") continue;
+      visibles.push(e);
+      for (const s of entitySegments(e)) segsAll.push(s);
+    }
+    // 1) 端點
+    let best: [number, number] | null = null;
+    let bestD = tol;
+    for (const s of segsAll) {
+      for (const [px, py] of [[s[0], s[1]], [s[2], s[3]]] as [number, number][]) {
+        const d = Math.hypot(px - w[0], py - w[1]);
+        if (d < bestD) { bestD = d; best = [px, py]; }
       }
     }
-    return best;
+    if (best) return { point: best, type: "endpoint" };
+    // 2) 中點
+    for (const s of segsAll) {
+      const mx = (s[0] + s[2]) / 2, my = (s[1] + s[3]) / 2;
+      const d = Math.hypot(mx - w[0], my - w[1]);
+      if (d < bestD) { bestD = d; best = [mx, my]; }
+    }
+    if (best) return { point: best, type: "midpoint" };
+    // 3) 交點
+    for (let i = 0; i < segsAll.length; i++) {
+      for (let j = i + 1; j < segsAll.length; j++) {
+        const p = segmentIntersect([segsAll[i][0], segsAll[i][1]], [segsAll[i][2], segsAll[i][3]], [segsAll[j][0], segsAll[j][1]], [segsAll[j][2], segsAll[j][3]]);
+        if (!p) continue;
+        const d = Math.hypot(p[0] - w[0], p[1] - w[1]);
+        if (d < bestD) { bestD = d; best = p; }
+      }
+    }
+    return best ? { point: best, type: "intersection" } : null;
+  }
+
+  /** 找最近的既有圖元端點（供畫線時錨點銜接吸附） */
+  function findSnap(w: [number, number]): [number, number] | null {
+    const r = findSnapFull(w);
+    return r ? r.point : null;
   }
 
   function hitTest(w: [number, number]): string | null {
@@ -658,14 +802,10 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       return;
     }
 
-    if (t === "line" || t === "arrow") {
+    if (t === "line" || t === "arrow" || t === "rect" || t === "roundrect" || t === "ellipse" || t === "star") {
       const s = findSnap(w) ?? w;
       snapRef.current = s === w ? null : s;
       dragRef.current = { kind: t, startW: s, curW: s };
-      return;
-    }
-    if (t === "rect" || t === "roundrect" || t === "ellipse" || t === "star") {
-      dragRef.current = { kind: t, startW: w, curW: w };
       return;
     }
     if (t === "fill") {
@@ -699,7 +839,9 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       return;
     }
     if (t === "measure") {
-      dragRef.current = { kind: "measure", startW: w, curW: w };
+      const s = findSnap(w) ?? w;
+      snapRef.current = s === w ? null : s;
+      dragRef.current = { kind: "measure", startW: s, curW: s };
       return;
     }
     if (t === "hand") {
@@ -850,6 +992,10 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
     const sy = ev.clientY - rect.top;
     const w = screenToWorld(viewRef.current, sx, sy);
     const d = dragRef.current;
+
+    // 即時座標顯示（CAD 狀態列）
+    cursorWorldRef.current = w;
+    updateCoordDisplay();
 
     // 更新十字準星位置（開啟時）
     if (showCrosshairRef.current) {
@@ -1006,23 +1152,45 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
           d.curW = snap;
           snapRef.current = snap;
         } else {
-          d.curW = applyConstraint(d.startW, w, d.kind, ev.shiftKey);
+          // 正交鎖定（F8）→ 90° 增量；否則 SHIFT → 45° 增量
+          const steps = orthoRef.current ? 4 : 8;
+          const constrain = ev.shiftKey || orthoRef.current;
+          d.curW = applyConstraint(d.startW, w, d.kind, constrain, steps);
           snapRef.current = null;
         }
         markOverlayDirty();
         break;
       }
-      case "measure":
-        d.curW = applyConstraint(d.startW, w, "line", ev.shiftKey);
+      case "measure": {
+        const snap = findSnap(w);
+        if (snap) {
+          d.curW = snap;
+          snapRef.current = snap;
+        } else {
+          const steps = orthoRef.current ? 4 : 8;
+          const constrain = ev.shiftKey || orthoRef.current;
+          d.curW = applyConstraint(d.startW, w, "line", constrain, steps);
+          snapRef.current = null;
+        }
         markOverlayDirty();
         break;
+      }
       case "rect":
       case "roundrect":
       case "ellipse":
-      case "star":
-        d.curW = applyConstraint(d.startW, w, d.kind, ev.shiftKey);
+      case "star": {
+        const snap = findSnap(w);
+        if (snap) {
+          d.curW = snap;
+          snapRef.current = snap;
+        } else {
+          const constrain = ev.shiftKey || orthoRef.current;
+          d.curW = applyConstraint(d.startW, w, d.kind, constrain, 8);
+          snapRef.current = null;
+        }
         markOverlayDirty();
         break;
+      }
       case "lasso":
         d.pts.push(...w);
         d.curW = w;
@@ -1033,18 +1201,27 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         if (hit) store.removeEntities([hit]);
         break;
       }
-      case "polyline":
-        d.curW = w;
+      case "polyline": {
+        const snap = findSnap(w);
+        if (snap) { d.curW = snap; snapRef.current = snap; }
+        else { d.curW = w; snapRef.current = null; }
         markOverlayDirty();
         break;
-      case "polygon":
-        d.curW = w;
+      }
+      case "polygon": {
+        const snap = findSnap(w);
+        if (snap) { d.curW = snap; snapRef.current = snap; }
+        else { d.curW = w; snapRef.current = null; }
         markOverlayDirty();
         break;
-      case "arc":
-        d.curW = w;
+      }
+      case "arc": {
+        const snap = findSnap(w);
+        if (snap) { d.curW = snap; snapRef.current = snap; }
+        else { d.curW = w; snapRef.current = null; }
         markOverlayDirty();
         break;
+      }
     }
   }
 
@@ -1374,6 +1551,12 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       if (ev.key === "Delete" || ev.key === "Backspace") {
         store.removeEntities([...store.selection]);
         ev.preventDefault();
+      } else if (ev.key === "F8") {
+        ev.preventDefault();
+        onToggleOrtho?.();
+      } else if (ev.key === "F9") {
+        ev.preventDefault();
+        onToggleSnap?.();
       } else if (ev.key === "Escape") {
         if (dragRef.current?.kind === "polyline") dragRef.current = null;
         if (dragRef.current?.kind === "polygon") dragRef.current = null;
@@ -1497,6 +1680,8 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         onPointerUp={onPointerUp}
         onPointerLeave={() => {
           crosshairRef.current = null;
+          cursorWorldRef.current = null;
+          updateCoordDisplay();
           markOverlayDirty();
         }}
         onDoubleClick={onDoubleClick}
@@ -1563,6 +1748,25 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
             />
           );
         })()}
+      {/* CAD 狀態列：即時座標 + 精確座標輸入 */}
+      <div className="absolute left-2 bottom-2 flex items-center gap-2 z-10">
+        <span
+          ref={coordRef}
+          className="px-2 py-0.5 rounded bg-white/90 dark:bg-neutral-900/90 text-[11px] font-mono text-neutral-600 dark:text-neutral-300 ring-1 ring-neutral-200 dark:ring-neutral-700 whitespace-nowrap pointer-events-none"
+        />
+        <input
+          ref={coordInputRef}
+          className="pointer-events-auto w-40 px-2 py-0.5 rounded bg-white/90 dark:bg-neutral-900/90 text-[11px] font-mono text-neutral-700 dark:text-neutral-200 ring-1 ring-neutral-200 dark:ring-neutral-700 outline-none placeholder:text-neutral-400"
+          placeholder="座標 x,y 或 @dx,dy"
+          title="輸入絕對座標「x,y」移動選取物件到該點，或「@dx,dy」相對移動（已校準時單位為公尺）"
+          onKeyDown={(e) => {
+            if (e.key === "Enter") applyCoordInput();
+            else if (e.key === "Escape") e.currentTarget.value = "";
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        />
+      </div>
       <input
         ref={imageInputRef}
         type="file"
