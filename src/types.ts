@@ -14,6 +14,8 @@ export type ToolId =
   | "arrow"
   | "ellipse"
   | "star"
+  | "crosswalk"
+  | "sidewalk"
   | "fill"
   | "text"
   | "image"
@@ -53,6 +55,7 @@ export interface VecEntity {
   closed?: boolean;
   stroke: string; // "#rrggbb"
   width: number; // 線寬 (pt)
+  /** 填充：色值 "#rrggbb" 或圖樣關鍵字 "hatch"（斜線）/ "grid"（方格）/ "xgrid"（斜格）/ "crosswalk"（斑馬線）/ "sidewalk"（人行道磚紋） */
   fill?: string;
   dash?: string; // "4,4" 虛線
   /** 箭頭頭部大小倍率（kind=arrow，預設 1 = 隨線寬的標準比例） */

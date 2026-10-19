@@ -958,6 +958,29 @@ function FillPicker({ value, onChange }: { value: string; onChange: (c: string) 
       >
         <span className="text-neutral-700 dark:text-neutral-200" style={{ textShadow: "0 0 2px #fff" }}>▩</span>
       </button>
+      <button
+        onClick={() => onChange("crosswalk")}
+        title="斑馬線填充（枕木紋）"
+        className={`w-6 h-6 rounded border ${
+          value === "crosswalk"
+            ? "ring-2 ring-primary-500 ring-offset-1 bg-white dark:bg-neutral-800"
+            : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+        }`}
+        style={{ background: "repeating-linear-gradient(90deg,#888,#888 2px,#fff 2px,#fff 5px)" }}
+      />
+      <button
+        onClick={() => onChange("sidewalk")}
+        title="人行道填充（磚紋鋪面）"
+        className={`w-6 h-6 rounded border ${
+          value === "sidewalk"
+            ? "ring-2 ring-primary-500 ring-offset-1 bg-white dark:bg-neutral-800"
+            : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+        }`}
+        style={{
+          background:
+            "repeating-linear-gradient(0deg,#888,#888 1px,transparent 1px,transparent 5px),repeating-linear-gradient(90deg,#888,#888 1px,transparent 1px,transparent 10px)",
+        }}
+      />
       {COLORS.map((c) => (
         <button
           key={c}

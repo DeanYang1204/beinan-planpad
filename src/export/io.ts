@@ -89,6 +89,8 @@ function fillAttr(e: VecEntity): string {
   if (e.fill === "hatch") return ` fill="url(#hatch)"`;
   if (e.fill === "grid") return ` fill="url(#grid)"`;
   if (e.fill === "xgrid") return ` fill="url(#xgrid)"`;
+  // 斑馬線/人行道以 clip 圖樣繪製，本體 path 只描外框
+  if (e.fill === "crosswalk" || e.fill === "sidewalk") return ` fill="none"`;
   if (e.fill) return ` fill="${e.fill}"`;
   return ` fill="none"`;
 }
@@ -97,6 +99,58 @@ function fillAttr(e: VecEntity): string {
 function strokeAttr(e: VecEntity): string {
   if (e.noStroke) return "";
   return ` stroke="${e.stroke}" stroke-width="${fmt(e.width)}"`;
+}
+
+let svgClipCounter = 0;
+
+/** 斑馬線圖樣（條紋平行短邊、沿長邊均分） */
+function crosswalkPatternSVG(e: VecEntity): string {
+  const bb = e.bbox || entityBbox(e);
+  const x0 = bb[0], y0 = bb[1], w = bb[2] - bb[0], h = bb[3] - bb[1];
+  const horizontal = w >= h;
+  const longSide = horizontal ? w : h;
+  const shortSide = horizontal ? h : w;
+  const n = Math.max(1, Math.round(longSide / (shortSide * 0.3)));
+  const pitch = longSide / n;
+  const barW = pitch * 0.5;
+  let out = "";
+  if (horizontal) {
+    for (let i = 0; i < n; i++) {
+      const bx = x0 + i * pitch + (pitch - barW) / 2;
+      out += `<rect x="${fmt(bx)}" y="${fmt(y0)}" width="${fmt(barW)}" height="${fmt(h)}" fill="${e.stroke}"/>`;
+    }
+  } else {
+    for (let i = 0; i < n; i++) {
+      const by = y0 + i * pitch + (pitch - barW) / 2;
+      out += `<rect x="${fmt(x0)}" y="${fmt(by)}" width="${fmt(w)}" height="${fmt(barW)}" fill="${e.stroke}"/>`;
+    }
+  }
+  return out;
+}
+
+/** 人行道圖樣（磚紋鋪面） */
+function sidewalkPatternSVG(e: VecEntity): string {
+  const bb = e.bbox || entityBbox(e);
+  const x0 = bb[0], y0 = bb[1], w = bb[2] - bb[0], h = bb[3] - bb[1];
+  const shortSide = Math.min(w, h);
+  const brickH = Math.max(2, shortSide * 0.16);
+  const brickW = brickH * 2.2;
+  const lw = Math.max(0.5, (e.width ?? 1) * 0.5);
+  const lines: string[] = [];
+  for (let y = y0; y <= y0 + h + brickH; y += brickH) {
+    const sy = Math.min(y, y0 + h);
+    lines.push(`M${fmt(x0)} ${fmt(sy)}H${fmt(x0 + w)}`);
+  }
+  let row = 0;
+  for (let y = y0; y < y0 + h; y += brickH, row++) {
+    const offset = (row % 2) * (brickW / 2);
+    const yTop = y;
+    const yBot = Math.min(y + brickH, y0 + h);
+    for (let x = x0 - offset; x <= x0 + w + brickW; x += brickW) {
+      lines.push(`M${fmt(x)} ${fmt(yTop)}V${fmt(yBot)}`);
+    }
+  }
+  return `<path d="${lines.join("")}" fill="none" stroke="${e.stroke}" stroke-width="${fmt(lw)}"/>`;
 }
 
 function entityToSVG(e: VecEntity, metersPerPt?: number): string {
@@ -282,6 +336,13 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
   const fill = fillAttr(e);
   const dash = e.dash ? ` stroke-dasharray="${e.dash}"` : "";
   let s = `<path d="${d}"${strokeAttr(e)} stroke-linecap="round" stroke-linejoin="round"${fill}${dash}/>`;
+
+  // 斑馬線 / 人行道：以 clip 繪製圖樣（本體 path 僅描外框）
+  if (e.fill === "crosswalk" || e.fill === "sidewalk") {
+    const clipId = "clip" + (++svgClipCounter).toString(36);
+    const pattern = e.fill === "crosswalk" ? crosswalkPatternSVG(e) : sidewalkPatternSVG(e);
+    s = `<defs><clipPath id="${clipId}"><path d="${d}"/></clipPath></defs><g clip-path="url(#${clipId})">${pattern}</g>` + s;
+  }
 
   if (e.kind === "arrow") {
     const drawHeadPoly = (h: { tip: [number, number]; w1: [number, number]; w2: [number, number] }) =>

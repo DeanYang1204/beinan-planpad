@@ -423,6 +423,66 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     }
     ctx.stroke();
     ctx.restore();
+  } else if (e.fill === "crosswalk") {
+    // 斑馬線（枕木紋）：條紋平行短邊、沿長邊均分，色為描邊色
+    ctx.save();
+    ctx.clip(path);
+    const bb = e.bbox || entityBbox(e);
+    const cx0 = bb[0] * s + v.ox;
+    const cy0 = bb[1] * s + v.oy;
+    const cw = (bb[2] - bb[0]) * s;
+    const ch = (bb[3] - bb[1]) * s;
+    const horizontal = cw >= ch;
+    const longSide = horizontal ? cw : ch;
+    const shortSide = horizontal ? ch : cw;
+    const n = Math.max(1, Math.round(longSide / (shortSide * 0.3)));
+    const pitch = longSide / n;
+    const barW = pitch * 0.5;
+    ctx.fillStyle = e.stroke;
+    if (horizontal) {
+      for (let i = 0; i < n; i++) {
+        const bx = cx0 + i * pitch + (pitch - barW) / 2;
+        ctx.fillRect(bx, cy0, barW, ch);
+      }
+    } else {
+      for (let i = 0; i < n; i++) {
+        const by = cy0 + i * pitch + (pitch - barW) / 2;
+        ctx.fillRect(cx0, by, cw, barW);
+      }
+    }
+    ctx.restore();
+  } else if (e.fill === "sidewalk") {
+    // 人行道（磚紋鋪面）：水平磚縫 + 交錯垂直磚縫
+    ctx.save();
+    ctx.clip(path);
+    const bb = e.bbox || entityBbox(e);
+    const sx0 = bb[0] * s + v.ox;
+    const sy0 = bb[1] * s + v.oy;
+    const sw = (bb[2] - bb[0]) * s;
+    const sh = (bb[3] - bb[1]) * s;
+    const shortSide = Math.min(sw, sh);
+    const brickH = Math.max(2, shortSide * 0.16);
+    const brickW = brickH * 2.2;
+    ctx.strokeStyle = e.stroke;
+    ctx.lineWidth = Math.max(0.5, e.width * s * 0.5);
+    ctx.beginPath();
+    for (let y = sy0; y <= sy0 + sh + brickH; y += brickH) {
+      const sy = Math.min(y, sy0 + sh);
+      ctx.moveTo(sx0, sy);
+      ctx.lineTo(sx0 + sw, sy);
+    }
+    let row = 0;
+    for (let y = sy0; y < sy0 + sh; y += brickH, row++) {
+      const offset = (row % 2) * (brickW / 2);
+      const yTop = y;
+      const yBot = Math.min(y + brickH, sy0 + sh);
+      for (let x = sx0 - offset; x <= sx0 + sw + brickW; x += brickW) {
+        ctx.moveTo(x, yTop);
+        ctx.lineTo(x, yBot);
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
   } else if (e.fill) {
     ctx.fillStyle = e.fill;
     ctx.fill(path);

@@ -214,6 +214,33 @@ export default function OptionsBar({ tool, style, onStyleChange, metersPerPt, on
     );
   }
 
+  // 道路標線工具（斑馬線 / 人行道）：圖樣以描邊色呈現，僅調顏色與線寬
+  if (tool === "crosswalk" || tool === "sidewalk") {
+    return (
+      <div className="h-9 shrink-0 flex items-center gap-3 px-3 bg-white border-b border-neutral-200 dark:bg-neutral-900 dark:border-neutral-800 text-xs overflow-x-auto whitespace-nowrap">
+        <span className="text-neutral-400">{tool === "crosswalk" ? "斑馬線" : "人行道"}</span>
+        <ColorField label="顏色" value={style.stroke} onChange={(c) => onStyleChange({ stroke: c })} />
+        <div className="flex items-center gap-1">
+          <span className="text-neutral-400">線寬</span>
+          {WIDTHS.map((w) => (
+            <button
+              key={w}
+              onClick={() => onStyleChange({ width: w })}
+              className={`w-7 h-6 rounded border text-[11px] leading-none ${
+                style.width === w
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+              }`}
+            >
+              {w}
+            </button>
+          ))}
+        </div>
+        <span className="ml-auto text-[11px] text-neutral-400">拖曳畫出範圍 · 顏色為圖樣線色</span>
+      </div>
+    );
+  }
+
   return null;
 }
 
@@ -288,6 +315,25 @@ function FillField({ label, value, onChange }: { label: string; value: string; o
         style={{
           background:
             "repeating-linear-gradient(45deg,#888,#888 1px,#fff 1px,#fff 4px),repeating-linear-gradient(-45deg,#888,#888 1px,#fff 1px,#fff 4px)",
+        }}
+      />
+      <button
+        onClick={() => onChange("crosswalk")}
+        title="斑馬線填充（枕木紋）"
+        className={`w-[18px] h-[18px] rounded border ${
+          value === "crosswalk" ? "ring-2 ring-primary-500 ring-offset-1" : "border-neutral-300 dark:border-neutral-600"
+        }`}
+        style={{ background: "repeating-linear-gradient(90deg,#888,#888 2px,#fff 2px,#fff 5px)" }}
+      />
+      <button
+        onClick={() => onChange("sidewalk")}
+        title="人行道填充（磚紋鋪面）"
+        className={`w-[18px] h-[18px] rounded border ${
+          value === "sidewalk" ? "ring-2 ring-primary-500 ring-offset-1" : "border-neutral-300 dark:border-neutral-600"
+        }`}
+        style={{
+          background:
+            "repeating-linear-gradient(0deg,#888,#888 1px,transparent 1px,transparent 5px),repeating-linear-gradient(90deg,#888,#888 1px,transparent 1px,transparent 10px)",
         }}
       />
       {COLORS.map((c) => (

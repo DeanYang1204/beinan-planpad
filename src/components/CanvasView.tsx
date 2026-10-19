@@ -28,6 +28,8 @@ const KIND_LABEL: Record<string, string> = {
   text: "文字",
   image: "圖片",
   dimension: "距離標註",
+  crosswalk: "斑馬線",
+  sidewalk: "人行道",
 };
 
 export interface CanvasApi {
@@ -75,7 +77,7 @@ type DragState =
   | { kind: "marquee"; startW: [number, number]; curW: [number, number] }
   | { kind: "line"; startW: [number, number]; curW: [number, number] }
   | { kind: "arrow"; startW: [number, number]; curW: [number, number] }
-  | { kind: "rect"; startW: [number, number]; curW: [number, number] }
+  | { kind: "rect"; startW: [number, number]; curW: [number, number]; fill?: string; label?: string }
   | { kind: "roundrect"; startW: [number, number]; curW: [number, number] }
   | { kind: "ellipse"; startW: [number, number]; curW: [number, number] }
   | { kind: "star"; startW: [number, number]; curW: [number, number] }
@@ -362,7 +364,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
     const d = dragRef.current;
     const snapPt = snapRef.current;
     if (!d) return { ghost: null, marquee: undefined, snapPt };
-    const mk = (pts: number[], kind: VecEntity["kind"], closed = false): VecEntity => ({
+    const mk = (pts: number[], kind: VecEntity["kind"], closed = false, fillOverride?: string): VecEntity => ({
       id: "__ghost__",
       kind,
       pts,
@@ -370,7 +372,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       stroke: styleRef.current.stroke,
       width: styleRef.current.width,
       dash: styleRef.current.dash || undefined,
-      fill: styleRef.current.fill || undefined,
+      fill: fillOverride ?? (styleRef.current.fill || undefined),
       origin: "user",
       layerId: "user",
     });
@@ -390,7 +392,7 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         const y0 = Math.min(d.startW[1], d.curW[1]);
         const x1 = Math.max(d.startW[0], d.curW[0]);
         const y1 = Math.max(d.startW[1], d.curW[1]);
-        out = { ghost: mk([x0, y0, x1, y0, x1, y1, x0, y1], "rect", true) };
+        out = { ghost: mk([x0, y0, x1, y0, x1, y1, x0, y1], "rect", true, d.fill) };
         break;
       }
       case "roundrect": {
@@ -806,6 +808,12 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
       const s = findSnap(w) ?? w;
       snapRef.current = s === w ? null : s;
       dragRef.current = { kind: t, startW: s, curW: s };
+      return;
+    }
+    if (t === "crosswalk" || t === "sidewalk") {
+      const s = findSnap(w) ?? w;
+      snapRef.current = s === w ? null : s;
+      dragRef.current = { kind: "rect", startW: s, curW: s, fill: t, label: KIND_LABEL[t] };
       return;
     }
     if (t === "fill") {
@@ -1363,6 +1371,8 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
         const w1 = Math.max(d.startW[0], bx);
         const h1 = Math.max(d.startW[1], by);
         if (w1 - w0 > 1 && h1 - h0 > 1) {
+          const specialFill = d.kind === "rect" ? d.fill : undefined;
+          const specialLabel = d.kind === "rect" ? d.label : undefined;
           const e: VecEntity = {
             id: genId(),
             kind: "rect",
@@ -1372,9 +1382,9 @@ export default function CanvasView({ store, tool, style, apiRef, onHoverChange, 
             stroke: styleRef.current.stroke,
             width: styleRef.current.width,
             dash: styleRef.current.dash || undefined,
-            fill: styleRef.current.fill || undefined,
+            fill: specialFill ?? (styleRef.current.fill || undefined),
             origin: "user",
-            layerId: store.ensureDrawLayer(styleRef.current.stroke, d.kind === "roundrect" ? KIND_LABEL.roundrect : KIND_LABEL.rect),
+            layerId: store.ensureDrawLayer(styleRef.current.stroke, specialLabel ?? (d.kind === "roundrect" ? KIND_LABEL.roundrect : KIND_LABEL.rect)),
           };
           store.addEntity(e);
           store.setSelection([e.id]);
@@ -1797,6 +1807,8 @@ function cursorFor(tool: ToolId): string {
     case "roundrect":
     case "ellipse":
     case "star":
+    case "crosswalk":
+    case "sidewalk":
     case "eyedropper":
     case "eraser":
     case "lasso":

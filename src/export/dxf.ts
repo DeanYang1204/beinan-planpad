@@ -93,6 +93,11 @@ function solid(pts: [number, number][], ctx: Ctx): string {
   return s;
 }
 
+/** 實心矩形（SOLID 四點順序：左下→右下→右上→左上，確保不自我交叉） */
+function rectSolid(x0: number, y0: number, x1: number, y1: number, ctx: Ctx): string {
+  return solid([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], ctx);
+}
+
 function textEntity(e: VecEntity, x: number, y: number, str: string, ctx: Ctx): string {
   const fs = (e.fontSize ?? 12) * ctx.k;
   const rot = e.userRot ? (e.userRot * 180) / Math.PI : 0;
@@ -208,6 +213,50 @@ function entityToDXF(e: VecEntity, doc: PlanDoc, ctx: Ctx): string {
     corner(x0 + r, y1 - r, Math.PI / 2, Math.PI); // 左下
     corner(x0 + r, y0 + r, Math.PI, (3 * Math.PI) / 2); // 左上
     return polyline(e, pts, true, ctx) + color;
+  }
+
+  // 斑馬線 / 人行道：外框折線 + 圖樣（斑馬線=實心條紋、人行道=磚縫線）
+  if (e.fill === "crosswalk" || e.fill === "sidewalk") {
+    const bb = e.bbox || entityBbox(e);
+    const x0 = bb[0], y0 = bb[1], w = bb[2] - bb[0], h = bb[3] - bb[1];
+    let s = polyline(e, e.pts, !!e.closed, ctx);
+    if (e.fill === "crosswalk") {
+      const horizontal = w >= h;
+      const longSide = horizontal ? w : h;
+      const shortSide = horizontal ? h : w;
+      const n = Math.max(1, Math.round(longSide / (shortSide * 0.3)));
+      const pitch = longSide / n;
+      const barW = pitch * 0.5;
+      if (horizontal) {
+        for (let i = 0; i < n; i++) {
+          const bx = x0 + i * pitch + (pitch - barW) / 2;
+          s += rectSolid(bx, y0, bx + barW, y0 + h, ctx);
+        }
+      } else {
+        for (let i = 0; i < n; i++) {
+          const by = y0 + i * pitch + (pitch - barW) / 2;
+          s += rectSolid(x0, by, x0 + w, by + barW, ctx);
+        }
+      }
+    } else {
+      const shortSide = Math.min(w, h);
+      const brickH = Math.max(2, shortSide * 0.16);
+      const brickW = brickH * 2.2;
+      for (let y = y0; y <= y0 + h + brickH; y += brickH) {
+        const sy = Math.min(y, y0 + h);
+        s += line([x0, sy], [x0 + w, sy], ctx);
+      }
+      let row = 0;
+      for (let y = y0; y < y0 + h; y += brickH, row++) {
+        const offset = (row % 2) * (brickW / 2);
+        const yTop = y;
+        const yBot = Math.min(y + brickH, y0 + h);
+        for (let x = x0 - offset; x <= x0 + w + brickW; x += brickW) {
+          s += line([x, yTop], [x, yBot], ctx);
+        }
+      }
+    }
+    return s + color;
   }
 
   return polyline(e, e.pts, !!e.closed, ctx) + color;

@@ -98,6 +98,13 @@ const SLOTS: SlotDef[] = [
     id: "measure",
     tools: [{ id: "measure", label: "測量工具", icon: "measure", key: "M" }],
   },
+  {
+    id: "road",
+    tools: [
+      { id: "crosswalk", label: "斑馬線", icon: "crosswalk", key: "" },
+      { id: "sidewalk", label: "人行道", icon: "sidewalk", key: "" },
+    ],
+  },
 ];
 
 // ============ SVG 圖標（stroke 風格，近似 PS 乾淨感） ============
@@ -154,6 +161,19 @@ function Icon({ name }: { name: string }) {
       <>
         {p("M2 14L14 2")}
         {p("M5 11l3-3M9 7l3-3")}
+      </>
+    ),
+    crosswalk: (
+      <>
+        <rect x="2.5" y="3" width="11" height="10" rx="0.5" />
+        {p("M5.5 3v10M8 3v10M10.5 3v10")}
+      </>
+    ),
+    sidewalk: (
+      <>
+        <rect x="2.5" y="3" width="11" height="10" rx="0.5" />
+        {p("M2.5 6.5h11M2.5 10h11")}
+        {p("M6 3v3.5M10 6.5V10M6 10v3")}
       </>
     ),
     roundrect: <rect x="3" y="4.5" width="10" height="7" rx="2.5" />,
@@ -418,6 +438,31 @@ export default function Toolbar({
                   style={{
                     background:
                       "repeating-linear-gradient(45deg,#888,#888 1px,#fff 1px,#fff 4px),repeating-linear-gradient(-45deg,#888,#888 1px,#fff 1px,#fff 4px)",
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    onStyleChange({ fill: "crosswalk" });
+                    setOpenSlot(null);
+                  }}
+                  title="斑馬線填充（枕木紋）"
+                  className={`w-6 h-6 rounded border ${
+                    style.fill === "crosswalk" ? "ring-2 ring-primary-500" : "border-neutral-300 dark:border-neutral-600"
+                  }`}
+                  style={{ background: "repeating-linear-gradient(90deg,#888,#888 2px,#fff 2px,#fff 5px)" }}
+                />
+                <button
+                  onClick={() => {
+                    onStyleChange({ fill: "sidewalk" });
+                    setOpenSlot(null);
+                  }}
+                  title="人行道填充（磚紋鋪面）"
+                  className={`w-6 h-6 rounded border ${
+                    style.fill === "sidewalk" ? "ring-2 ring-primary-500" : "border-neutral-300 dark:border-neutral-600"
+                  }`}
+                  style={{
+                    background:
+                      "repeating-linear-gradient(0deg,#888,#888 1px,transparent 1px,transparent 5px),repeating-linear-gradient(90deg,#888,#888 1px,transparent 1px,transparent 10px)",
                   }}
                 />
                 {["#e53935", "#1e88e5", "#43a047", "#ffb300", "#8e24aa", "#00acc1", "#f06292", "#000000"].map((c) => (
