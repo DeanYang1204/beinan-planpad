@@ -161,7 +161,7 @@ function entityToSVG(e: VecEntity, metersPerPt?: number): string {
     const lp = dimensionLabelPos(e);
     const lx = lp?.x ?? g.mx;
     const ly = lp?.y ?? g.my;
-    const label = dimensionLabelText(g.len, metersPerPt, e.labelPrefix);
+    const label = dimensionLabelText(g.len, metersPerPt, e.labelPrefix, e.labelOverride);
     const labelFill = e.labelColor ?? e.stroke;
     const tw = measureTextWidth(label, fs, e.fontFamily);
     const padX = fs * 0.15;

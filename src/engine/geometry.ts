@@ -15,6 +15,7 @@ interface BboxEntity {
   h?: number;
   userRot?: number;
   labelPrefix?: string;
+  labelOverride?: string;
 }
 
 /** 距離標註幾何：起訖點、垂直單位向量、長度、中點 */
@@ -145,9 +146,9 @@ export function dimensionEnds(e: {
 export function entityBboxRaw(e: BboxEntity): BBox {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   if (e.kind === "dimension") {
-    // 距離標註：兩端點 bbox + 標籤（垂直外浮，前綴會加寬文字）與箭頭外擴（含大小倍率）
+    // 距離標註：兩端點 bbox + 標籤（垂直外浮，前綴/自訂文字會加寬文字）與箭頭外擴（含大小倍率）
     const fs = e.fontSize ?? 12;
-    const pad = fs * 2 + (e.labelPrefix?.length ?? 0) * fs;
+    const pad = fs * 2 + (((e.labelPrefix?.length ?? 0) + (e.labelOverride?.length ?? 0)) * fs);
     return [
       Math.min(e.pts[0], e.pts[2]) - pad,
       Math.min(e.pts[1], e.pts[3]) - pad,

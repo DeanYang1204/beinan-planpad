@@ -125,7 +125,7 @@ function entityToDXF(e: VecEntity, doc: PlanDoc, ctx: Ctx): string {
     }
     // 標籤文字（含前綴）
     const lp = dimensionLabelPos(e);
-    const label = dimensionLabelText(gm.len, doc.metersPerPt, e.labelPrefix);
+    const label = dimensionLabelText(gm.len, doc.metersPerPt, e.labelPrefix, e.labelOverride);
     if (lp) s += textEntity(e, lp.x, lp.y, label, ctx);
     return s;
   }

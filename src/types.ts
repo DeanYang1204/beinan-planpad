@@ -83,6 +83,8 @@ export interface VecEntity {
   labelSide?: "above" | "below";
   /** 距離標註文字前綴（如「高」「寬」，顯示在公尺數前；未設 = 無前綴） */
   labelPrefix?: string;
+  /** 距離標註自訂文字：設定後完全取代「依比例換算」的公尺數（不參照比例），可自由輸入任意文字/數值 */
+  labelOverride?: string;
   /** 距離標註端點樣式（預設 arrow 實心三角；open=空心、tick=斜線、ibeam=工字型、dot=圓點、box=方塊） */
   dimArrowStyle?: DimensionArrowStyle;
   /** 距離標註箭頭大小倍率（預設 1 = 隨字號標準比例） */
@@ -305,7 +307,9 @@ export function dimensionLabel(ptLen: number, metersPerPt?: number): string {
   return "未校準";
 }
 
-/** 距離標註完整標籤文字（含前綴，如「高4.3 M」） */
-export function dimensionLabelText(ptLen: number, metersPerPt: number | undefined, prefix?: string): string {
+/** 距離標註完整標籤文字（含前綴，如「高4.3 M」）。
+ *  labelOverride 非空時直接回傳該自訂文字（不參照比例，前綴也由使用者自行控制）。 */
+export function dimensionLabelText(ptLen: number, metersPerPt: number | undefined, prefix?: string, override?: string): string {
+  if (override !== undefined && override !== "") return override;
   return (prefix ?? "") + dimensionLabel(ptLen, metersPerPt);
 }

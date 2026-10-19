@@ -1,6 +1,6 @@
 import type { DocStore } from "../engine/document";
 import type { VecEntity } from "../types";
-import { FONTS, formatMeters } from "../types";
+import { FONTS, dimensionLabelText } from "../types";
 import { useRef, useState } from "react";
 
 interface Props {
@@ -115,19 +115,66 @@ export default function PropertyPanel({ store, style, onStyleChange, onEditText 
 
       {single && first.kind === "dimension" ? (
         <div>
-          <div className="text-xs text-neutral-500 mb-1">距離</div>
-          <div className="text-2xl font-bold tabular-nums">
-            {store.doc?.metersPerPt
-              ? formatMeters(
-                  Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1]) * store.doc.metersPerPt
-                )
-              : "未校準"}
+          <div className="text-xs text-neutral-500 mb-1">距離標註文字</div>
+          <div className="flex gap-1 mb-3">
+            <button
+              onClick={() => store.updateStyle(first.id, { labelOverride: undefined })}
+              className={`flex-1 px-2 py-1.5 rounded border text-xs ${
+                !(first.labelOverride ?? "")
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+              }`}
+              title="依已校正的比例，自動把長度換算成公尺"
+            >
+              依比例換算
+            </button>
+            <button
+              onClick={() => {
+                const ptLen = Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1]);
+                store.updateStyle(first.id, {
+                  labelOverride: dimensionLabelText(ptLen, store.doc?.metersPerPt, first.labelPrefix),
+                });
+              }}
+              className={`flex-1 px-2 py-1.5 rounded border text-xs ${
+                first.labelOverride
+                  ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-200"
+                  : "border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+              }`}
+              title="自行輸入標註文字，不參照比例換算"
+            >
+              自訂文字
+            </button>
           </div>
-          <Recalibrate
-            store={store}
-            ptLength={Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1])}
-          />
-          <SetLength store={store} id={first.id} />
+          <div className="text-2xl font-bold tabular-nums break-all">
+            {dimensionLabelText(
+              Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1]),
+              store.doc?.metersPerPt,
+              first.labelPrefix,
+              first.labelOverride
+            )}
+          </div>
+          {first.labelOverride ? (
+            <div className="mt-3">
+              <div className="text-xs text-neutral-500 mb-1">自訂文字（不參照比例）</div>
+              <input
+                value={first.labelOverride}
+                onChange={(ev) => store.updateStyle(first.id, { labelOverride: ev.target.value || undefined })}
+                placeholder="輸入任意文字或數值"
+                className="w-full px-2 py-1.5 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-xs"
+              />
+              <div className="text-[11px] text-neutral-400 mt-1">
+                此文字會取代依比例換算的公尺數（可自行加上單位，如「約 5 米」）
+              </div>
+            </div>
+          ) : (
+            <>
+              <Recalibrate
+                store={store}
+                ptLength={Math.hypot(first.pts[2] - first.pts[0], first.pts[3] - first.pts[1])}
+              />
+              <SetLength store={store} id={first.id} />
+            </>
+          )}
           <div className="mt-3 mb-1 text-xs text-neutral-500">線條顏色</div>
           <ColorPicker value={first.stroke} onChange={(c) => store.updateStyle(first.id, { stroke: c })} />
           <div className="mt-3 mb-1 text-xs text-neutral-500 flex items-center justify-between">

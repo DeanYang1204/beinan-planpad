@@ -263,7 +263,7 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     }
     ctx.restore(); // 結束線條不透明度（標籤不受影響）
     // 中點垂直外浮標籤（白底黑字，供平面圖上易讀；labelSide 決定上下方、labelPrefix 為文字前綴）
-    const label = dimensionLabelText(g.len, opts.metersPerPt, e.labelPrefix);
+    const label = dimensionLabelText(g.len, opts.metersPerPt, e.labelPrefix, e.labelOverride);
     const lp = dimensionLabelPos(e);
     const lx = lp?.x ?? g.mx;
     const ly = lp?.y ?? g.my;
