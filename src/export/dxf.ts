@@ -224,8 +224,9 @@ function entityToDXF(e: VecEntity, doc: PlanDoc, ctx: Ctx): string {
       const horizontal = w >= h;
       const longSide = horizontal ? w : h;
       const shortSide = horizontal ? h : w;
-      const n = Math.max(1, Math.round(longSide / (shortSide * 0.3)));
-      const pitch = longSide / n;
+      // 短邊 <= 0 → 無條紋（避免除零產生 Infinity 無限迴圈）
+      const n = shortSide > 0 ? Math.max(1, Math.round(longSide / (shortSide * 0.3))) : 0;
+      const pitch = n > 0 ? longSide / n : 0;
       const barW = pitch * 0.5;
       if (horizontal) {
         for (let i = 0; i < n; i++) {
@@ -240,19 +241,21 @@ function entityToDXF(e: VecEntity, doc: PlanDoc, ctx: Ctx): string {
       }
     } else {
       const shortSide = Math.min(w, h);
-      const brickH = Math.max(2, shortSide * 0.16);
-      const brickW = brickH * 2.2;
-      for (let y = y0; y <= y0 + h + brickH; y += brickH) {
-        const sy = Math.min(y, y0 + h);
-        s += line([x0, sy], [x0 + w, sy], ctx);
-      }
-      let row = 0;
-      for (let y = y0; y < y0 + h; y += brickH, row++) {
-        const offset = (row % 2) * (brickW / 2);
-        const yTop = y;
-        const yBot = Math.min(y + brickH, y0 + h);
-        for (let x = x0 - offset; x <= x0 + w + brickW; x += brickW) {
-          s += line([x, yTop], [x, yBot], ctx);
+      if (shortSide > 0) { // 退化（零高/零寬）→ 無磚紋
+        const brickH = Math.max(2, shortSide * 0.16);
+        const brickW = brickH * 2.2;
+        for (let y = y0; y <= y0 + h + brickH; y += brickH) {
+          const sy = Math.min(y, y0 + h);
+          s += line([x0, sy], [x0 + w, sy], ctx);
+        }
+        let row = 0;
+        for (let y = y0; y < y0 + h; y += brickH, row++) {
+          const offset = (row % 2) * (brickW / 2);
+          const yTop = y;
+          const yBot = Math.min(y + brickH, y0 + h);
+          for (let x = x0 - offset; x <= x0 + w + brickW; x += brickW) {
+            s += line([x, yTop], [x, yBot], ctx);
+          }
         }
       }
     }

@@ -110,8 +110,9 @@ function crosswalkPatternSVG(e: VecEntity): string {
   const horizontal = w >= h;
   const longSide = horizontal ? w : h;
   const shortSide = horizontal ? h : w;
-  const n = Math.max(1, Math.round(longSide / (shortSide * 0.3)));
-  const pitch = longSide / n;
+  // 短邊 <= 0 → 無條紋（避免除零）
+  const n = shortSide > 0 ? Math.max(1, Math.round(longSide / (shortSide * 0.3))) : 0;
+  const pitch = n > 0 ? longSide / n : 0;
   const barW = pitch * 0.5;
   let out = "";
   if (horizontal) {
@@ -133,6 +134,7 @@ function sidewalkPatternSVG(e: VecEntity): string {
   const bb = e.bbox || entityBbox(e);
   const x0 = bb[0], y0 = bb[1], w = bb[2] - bb[0], h = bb[3] - bb[1];
   const shortSide = Math.min(w, h);
+  if (shortSide <= 0) return ""; // 退化（零高/零寬）→ 無磚紋
   const brickH = Math.max(2, shortSide * 0.16);
   const brickW = brickH * 2.2;
   const lw = Math.max(0.5, (e.width ?? 1) * 0.5);

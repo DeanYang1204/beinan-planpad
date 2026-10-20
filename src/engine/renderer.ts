@@ -435,8 +435,9 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     const horizontal = cw >= ch;
     const longSide = horizontal ? cw : ch;
     const shortSide = horizontal ? ch : cw;
-    const n = Math.max(1, Math.round(longSide / (shortSide * 0.3)));
-    const pitch = longSide / n;
+    // 短邊 <= 0（拖曳中瞬間零高/零寬）→ 無條紋，避免除零產生 Infinity 無限迴圈
+    const n = shortSide > 0 ? Math.max(1, Math.round(longSide / (shortSide * 0.3))) : 0;
+    const pitch = n > 0 ? longSide / n : 0;
     const barW = pitch * 0.5;
     ctx.fillStyle = e.stroke;
     if (horizontal) {
@@ -461,27 +462,30 @@ function renderEntityInner(ctx: CanvasRenderingContext2D, e: VecEntity, opts: Re
     const sw = (bb[2] - bb[0]) * s;
     const sh = (bb[3] - bb[1]) * s;
     const shortSide = Math.min(sw, sh);
-    const brickH = Math.max(2, shortSide * 0.16);
-    const brickW = brickH * 2.2;
-    ctx.strokeStyle = e.stroke;
-    ctx.lineWidth = Math.max(0.5, e.width * s * 0.5);
-    ctx.beginPath();
-    for (let y = sy0; y <= sy0 + sh + brickH; y += brickH) {
-      const sy = Math.min(y, sy0 + sh);
-      ctx.moveTo(sx0, sy);
-      ctx.lineTo(sx0 + sw, sy);
-    }
-    let row = 0;
-    for (let y = sy0; y < sy0 + sh; y += brickH, row++) {
-      const offset = (row % 2) * (brickW / 2);
-      const yTop = y;
-      const yBot = Math.min(y + brickH, sy0 + sh);
-      for (let x = sx0 - offset; x <= sx0 + sw + brickW; x += brickW) {
-        ctx.moveTo(x, yTop);
-        ctx.lineTo(x, yBot);
+    // 短邊 <= 0（拖曳中瞬間零高/零寬）→ 不畫磚紋，避免無意義繪製
+    if (shortSide > 0) {
+      const brickH = Math.max(2, shortSide * 0.16);
+      const brickW = brickH * 2.2;
+      ctx.strokeStyle = e.stroke;
+      ctx.lineWidth = Math.max(0.5, e.width * s * 0.5);
+      ctx.beginPath();
+      for (let y = sy0; y <= sy0 + sh + brickH; y += brickH) {
+        const sy = Math.min(y, sy0 + sh);
+        ctx.moveTo(sx0, sy);
+        ctx.lineTo(sx0 + sw, sy);
       }
+      let row = 0;
+      for (let y = sy0; y < sy0 + sh; y += brickH, row++) {
+        const offset = (row % 2) * (brickW / 2);
+        const yTop = y;
+        const yBot = Math.min(y + brickH, sy0 + sh);
+        for (let x = sx0 - offset; x <= sx0 + sw + brickW; x += brickW) {
+          ctx.moveTo(x, yTop);
+          ctx.lineTo(x, yBot);
+        }
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
     ctx.restore();
   } else if (e.fill) {
     ctx.fillStyle = e.fill;
